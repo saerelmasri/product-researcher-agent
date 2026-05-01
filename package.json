@@ -5,16 +5,27 @@
   "description": "Weekly automated agent that scrapes Meta Ad Library, scores products for private labeling in Lebanon, and writes reports to Notion.",
   "scripts": {
     "phase1": "ts-node src/phases/phase1-scraper.ts",
+    "phase2": "ts-node src/phases/phase2-filter.ts",
+    "phase3": "ts-node src/phases/phase3-competition.ts",
+    "phase4": "ts-node src/phases/phase4-suppliers.ts",
+    "phase5": "ts-node src/phases/phase5-analysis.ts",
+    "phase6": "ts-node src/phases/phase6-notion.ts",
     "build": "tsc",
-    "lint": "echo \"lint placeholder — add eslint later\" && exit 0"
+    "lint": "echo \"lint placeholder — add eslint later\" && exit 0",
+    "pipeline": "ts-node src/pipeline.ts",
+    "scheduler": "ts-node src/scheduler.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@notionhq/client": "^5.20.0",
     "axios": "^1.7.7",
-    "dotenv": "^16.4.5"
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.4.5",
+    "node-cron": "^4.2.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
+    "@types/node-cron": "^3.0.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.3"
   },
