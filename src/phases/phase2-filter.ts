@@ -99,7 +99,7 @@ async function scoreProductGroup(
   keyword: string,
   ads: MetaAd[],
   askClaude: (prompt: string, systemPrompt?: string) => Promise<string>,
-): Promise<ProductCandidate | null> {
+): Promise<Omit<ProductCandidate, 'verdict'> | null> {
   log.info(`Scoring keyword group: "${keyword}"`, { adCount: ads.length });
 
   const prompt = buildUserPrompt(keyword, ads);
@@ -117,11 +117,10 @@ async function scoreProductGroup(
   const parsed = parseClaudeResponse(rawResponse, keyword);
   if (!parsed) return null;
 
-  const candidate: ProductCandidate = {
+  const candidate: Omit<ProductCandidate, 'verdict'> = {
     product_name: parsed.product_name,
     niche: parsed.niche,
     score: parsed.score,
-    verdict: assignVerdict(parsed.score),
     selling_price_usd: parsed.selling_price_usd,
     alibaba_cost_range: parsed.alibaba_cost_range,
     estimated_margin_pct: parsed.estimated_margin_pct,
@@ -136,10 +135,9 @@ async function scoreProductGroup(
 
   log.info(`Scored "${parsed.product_name}"`, {
     score: parsed.score,
-    verdict: candidate.verdict,
   });
 
-  return candidate;
+  return candidate as any;
 }
 
 async function main(): Promise<void> {
@@ -188,7 +186,7 @@ async function main(): Promise<void> {
   log.info(`Grouped into ${keywords.length} keyword groups`, { keywords });
 
   // Score each group via Claude
-  const allCandidates: ProductCandidate[] = [];
+  const allCandidates: Omit<ProductCandidate, 'verdict'>[] = [];
 
   for (let i = 0; i < keywords.length; i++) {
     const keyword = keywords[i];
@@ -208,7 +206,10 @@ async function main(): Promise<void> {
   // Filter, sort, and cap results
   const passing = allCandidates.filter((c) => c.score >= MIN_SCORE);
   const sorted = passing.sort((a, b) => b.score - a.score);
-  const top = sorted.slice(0, MAX_CANDIDATES);
+  const top = sorted.slice(0, MAX_CANDIDATES).map((c) => ({
+    ...c,
+    verdict: assignVerdict(c.score),
+  }));
 
   log.info("Phase 2 summary", {
     groupsProcessed: keywords.length,
