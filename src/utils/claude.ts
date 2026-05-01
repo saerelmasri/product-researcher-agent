@@ -4,6 +4,15 @@ import { log } from "./logger";
 
 dotenv.config();
 
+if (!process.env.ANTHROPIC_API_KEY) {
+  log.error(
+    "ANTHROPIC_API_KEY is not set. Add it to .env once you have Anthropic credits."
+  );
+  throw new Error("ANTHROPIC_API_KEY is not set.");
+}
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
 const MODEL = "claude-opus-4-20250514";
 
 function sleep(ms: number): Promise<void> {
@@ -14,15 +23,6 @@ export async function askClaude(
   prompt: string,
   systemPrompt?: string
 ): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    log.error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env once you have Anthropic credits."
-    );
-    throw new Error("ANTHROPIC_API_KEY is not set.");
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const systemBlocks: Anthropic.TextBlockParam[] = systemPrompt
     ? [
         {
@@ -45,11 +45,14 @@ export async function askClaude(
         messages: [{ role: "user", content: prompt }],
       });
 
-      const firstBlock = response.content[0];
-      if (firstBlock.type === "text") {
-        return firstBlock.text;
+      if (!response.content.length) {
+        throw new Error("Claude returned an empty content array.");
       }
-      return "";
+      const firstBlock = response.content[0];
+      if (firstBlock.type !== "text") {
+        throw new Error(`Unexpected response block type: ${firstBlock.type}`);
+      }
+      return firstBlock.text;
     } catch (err) {
       const isOverload =
         err instanceof Anthropic.APIError && err.status === 529;
