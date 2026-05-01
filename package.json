@@ -1,0 +1,23 @@
+{
+  "name": "lebanon-product-research-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Weekly automated agent that scrapes Meta Ad Library, scores products for private labeling in Lebanon, and writes reports to Notion.",
+  "scripts": {
+    "phase1": "ts-node src/phases/phase1-scraper.ts",
+    "build": "tsc",
+    "lint": "echo \"lint placeholder — add eslint later\" && exit 0"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
