@@ -6,6 +6,7 @@
   "scripts": {
     "phase1": "ts-node src/phases/phase1-scraper.ts",
     "phase2": "ts-node src/phases/phase2-filter.ts",
+    "phase2.1": "ts-node src/phases/phase2-1-heuristic.ts",
     "phase3": "ts-node src/phases/phase3-competition.ts",
     "phase4": "ts-node src/phases/phase4-suppliers.ts",
     "phase5": "ts-node src/phases/phase5-analysis.ts",
