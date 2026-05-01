@@ -82,3 +82,46 @@ export const KEYWORDS_2025: string[] = [
 ];
 
 export const KEYWORDS_PER_RUN = 15;
+
+export interface AlibabaSupplier {
+  name: string;
+  stars: number | null;
+  certifications: string[];
+  price_per_unit: string;
+  moq: string;
+  url: string;
+}
+
+export interface CustomerObjection {
+  objection: string;
+  why_it_matters: string;
+  how_to_counter: string;
+}
+
+export interface ProductCandidate {
+  product_name: string;
+  niche: string;
+  score: number;
+  verdict: "Investigate" | "Watch" | "Skip";
+  selling_price_usd: number;
+  alibaba_cost_range: string;
+  estimated_margin_pct: number;
+  weight_kg: number;
+  lebanon_competition: "Low" | "Medium" | "High" | "Unknown";
+  has_recurring_purchase: boolean;
+  cross_sell_opportunities: string[];
+  source_ads: MetaAd[];
+  alibaba_suppliers: AlibabaSupplier[];
+  score_rationale: string;
+}
+
+export interface ProductReport extends ProductCandidate {
+  market_analysis: string;
+  customer_objections: CustomerObjection[];
+  agent_verdict: string;
+  recommended_next_step: string;
+  week_generated: string;
+}
+
+export type Phase2Output = ProductCandidate[];
+export type Phase5Output = ProductReport[];

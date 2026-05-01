@@ -9,6 +9,7 @@
     "lint": "echo \"lint placeholder — add eslint later\" && exit 0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5"
   },
