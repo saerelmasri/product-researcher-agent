@@ -2,8 +2,8 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
+import { KEYWORD_ESTIMATES } from "../config/keyword-estimates";
 import { MetaAd, Phase1Output, Phase2Output, ProductCandidate } from "../types";
-import { KEYWORD_ESTIMATES } from "../data/keyword-estimates";
 import { log } from "../utils/logger";
 
 dotenv.config();

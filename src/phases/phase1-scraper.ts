@@ -3,9 +3,8 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
+import { KEYWORDS_2025, KEYWORDS_PER_RUN } from "../config/keywords";
 import {
-  KEYWORDS_2025,
-  KEYWORDS_PER_RUN,
   MetaAd,
   MetaAdLibraryRawAd,
   MetaAdLibraryResponse,

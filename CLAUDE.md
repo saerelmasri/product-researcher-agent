@@ -22,25 +22,31 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
 ## Project structure
 ```
 /src
+  /config
+    keywords.ts                # KEYWORDS_2025 search list + KEYWORDS_PER_RUN
+    keyword-estimates.ts       # Phase 2.1 heuristic lookup table (price, weight, niche per keyword)
   /phases
-    phase1-scraper.ts       # Meta Ad Library scraper
-    phase2-filter.ts        # Claude scoring + criteria filter
-    phase3-competition.ts   # Lebanon competitor check
-    phase4-suppliers.ts     # Alibaba supplier lookup
-    phase5-analysis.ts      # Claude deep analysis + objections
-    phase6-notion.ts        # Notion writer
+    phase1-scraper.ts          # Meta Ad Library scraper
+    phase2-filter.ts           # Claude scoring + criteria filter (needs ANTHROPIC_API_KEY)
+    phase2-1-heuristic.ts      # Heuristic stopgap scorer — runs offline without Claude
+    phase3-competition.ts      # Lebanon competitor check
+    phase4-suppliers.ts        # Alibaba supplier lookup
+    phase5-analysis.ts         # Claude deep analysis + objections (needs ANTHROPIC_API_KEY)
+    phase5-1-template.ts       # Templated analysis stopgap — runs offline without Claude
+    phase6-notion.ts           # Notion writer
   /types
-    index.ts                # Shared TypeScript types
+    index.ts                   # Shared TypeScript types only (no data constants)
   /utils
-    claude.ts               # Claude API helper
-    logger.ts               # Simple logger
-  pipeline.ts               # Main orchestrator — runs all phases in sequence
-  scheduler.ts              # Cron job wrapper
+    claude.ts                  # Claude API helper (Anthropic SDK wrapper)
+    logger.ts                  # Simple logger
+  pipeline.ts                  # Main orchestrator — runs all phases in sequence
+  scheduler.ts                 # Cron job wrapper
 /data
   (runtime JSON files written here — gitignored)
-.env                        # API keys — never commit
-CLAUDE.md                   # This file
-PRD.md                      # Full product requirements
+.env                           # API keys — never commit (gitignored)
+.env.example                   # Placeholder template — committed, no real keys
+CLAUDE.md                      # This file
+PRD.md                         # Full product requirements
 ```
 
 ## Environment variables required
@@ -63,11 +69,13 @@ Build and test one phase at a time. Never move to the next phase until the curre
 
 ## Current status
 > **Update this section as you complete each phase.**
-- [ ] Phase 1 — Meta scraper
-- [ ] Phase 2 — Claude filter
+- [x] Phase 1 — Meta scraper
+- [x] Phase 2 — Claude filter
+- [x] Phase 2.1 — heuristic stopgap (offline test scorer; no Claude required)
 - [ ] Phase 3 — Lebanon competition
 - [ ] Phase 4 — Alibaba suppliers
 - [ ] Phase 5 — Claude deep analysis
+- [ ] Phase 5.1 — templated stopgap (offline test analyser; no Claude required)
 - [ ] Phase 6 — Notion writer + cron
 
 ## Key decisions already made
