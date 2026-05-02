@@ -38,43 +38,43 @@ Run once per week. Analyse ~200 global Meta ads. Deliver 10–20 qualified produ
 }]
 ```
 
-### Phase 2 — Claude product filter + scoring
-**What it does**: Sends each ad to Claude Sonnet with a structured prompt. Claude extracts the product, estimates key metrics, checks all 8 criteria, and returns a structured score.
+### Phase 2 — Product filter + scoring (three-tier criteria)
+**What it does**: For each ad keyword group, applies a three-tier private-label criteria framework. Phase 2 (Claude) and Phase 2.1 (heuristic stopgap) both use the same framework so swapping between them keeps semantics identical.
 
-**Claude prompt strategy**:
-- Send ad text + page name
-- Ask Claude to identify the product being sold
-- Ask Claude to estimate: selling price, weight, whether it's seasonal, cross-sell potential
-- Ask Claude to score 0–100 against the 8 criteria
-- Ask Claude to return JSON only
+**Private label criteria framework**
 
-**Filter thresholds**:
-- Score < 60: skip entirely
-- Score 60–74: keep, flag as "Watch"
-- Score 75+: keep, flag as "Investigate"
+**Must-have (any failure = hard reject, don't include in output)**
+- Gross margin ≥ 70% before ads — `(price − landed_cost) / price * 100`
+- Selling price ≥ $30
+- Weight < 0.5 kg including packaging
+- Has a natural repeat-purchase / reorder reason
+- Evergreen demand (stable Google Trends over 5 years, no spike-crash pattern)
+- Supports at least 2–3 logical cross-sells or upsells over time
 
-**Output limit**: After filtering, sort remaining candidates by score descending and take the top 5 only. These 5 go through Phases 3, 4, 5, and 6. This keeps Opus API costs controlled and ensures only the strongest candidates get full analysis.
+**Strong (subtract 10 from score for each that's missing)**
+- Top 3 competitor listings have < 300–500 reviews
+- Landed cost allows a 3× markup minimum
+- Clear differentiation angle (materials, formulation, bundling — not just logo swap)
+- Solves a specific searchable problem (not impulse-only)
+- First-order MOQ achievable under 500 units
+- No dominant national brand controlling the category
 
-**Output shape** (`data/candidates.json`):
-```json
-[{
-  "product_name": "string",
-  "niche": "string",
-  "estimated_sell_price": number,
-  "estimated_weight_kg": number,
-  "score": number,
-  "verdict": "Investigate | Watch",
-  "criteria": {
-    "price_above_30": boolean,
-    "margin_above_70": boolean,
-    "under_500g": boolean,
-    "not_seasonal": boolean,
-    "recurring_purchase": boolean,
-    "cross_sell_potential": boolean
-  },
-  "source_ad": { ...original ad object }
-}]
-```
+**Nice to have (add 5 to score for each that applies)**
+- Selling price ≥ $50
+- Giftable product
+- No patent or trademark conflicts
+- Simple manufacturing (no electronics, food certs, or children's compliance)
+
+**Score formula**: Start at 50 if all must-haves pass, then apply strong penalties (−10 each) and nice-to-have bonuses (+5 each). Floor at 0, cap at 100.
+
+**Verdict thresholds**
+- Score 75+: keep, flag as **Investigate**
+- Score 60–74: keep, flag as **Watch**
+- Score < 60 OR any must-have failed: drop entirely
+
+**Output limit**: After filtering, sort remaining candidates by score descending and take the top 5 only. These 5 go through Phases 3, 4, 5, and 6.
+
+**Heuristic stopgap (Phase 2.1)**: A deterministic version that uses pre-computed estimates per keyword (`src/config/keyword-estimates.ts`). It can evaluate all 6 must-haves, 2 of 6 strong items (3× markup, MOQ <500), and 3 of 4 nice-to-haves (price ≥$50, giftable, simple manufacturing). The remaining strong/nice items (competitor reviews, differentiation, problem-solving angle, dominant brand, IP/trademark) are deferred to the Claude version.
 
 ### Phase 3 — Lebanon competition check
 **What it does**: For each candidate product, re-queries Meta Ad Library with `ad_reached_countries=LB` and the product name as search term. Counts active local advertisers and estimates competition level.

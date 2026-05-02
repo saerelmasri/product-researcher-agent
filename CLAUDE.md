@@ -85,20 +85,38 @@ Build and test one phase at a time. Never move to the next phase until the curre
 - **Lebanon geo check**: Re-query Meta Ad Library filtered to Lebanon. High local ad spend = competition exists
 - **No UI**: Pure backend. Agent runs on schedule, writes to Notion, owner reviews Notion
 
-## Product scoring criteria (Phase 2)
-Claude must score each product 0–100 and check ALL of the following:
-- Selling price above $30 (ideally $50+)
-- Estimated margin at least 70% before ads
-- Product weight under 0.5kg
-- Not seasonal or trend-dependent
-- Has recurring purchase potential
-- Has 2–3 cross-sell product opportunities
-- Low competition in Lebanon
-- Verified Alibaba suppliers exist
+## Product scoring criteria (Phase 2 + Phase 2.1)
+Both Phase 2 (Claude) and Phase 2.1 (heuristic stopgap) use the same three-tier framework so they stay aligned.
 
-Products scoring below 60 are auto-filtered out. Products 60–74 are flagged "Watch". Products 75+ are flagged "Investigate".
+**Must-have (fail any = hard reject, dropped from output)**
+- Gross margin ≥ 70% before ads
+- Selling price ≥ $30
+- Weight < 0.5 kg including packaging
+- Has natural repeat-purchase / reorder reason
+- Evergreen demand (stable 5-year trend, no spike-crash)
+- Supports 2–3 logical cross-sells or upsells
 
-**Output limit: maximum 5 products per weekly run.** After scoring and filtering, take only the top 5 by score. If fewer than 5 pass the threshold, output only those that passed — never pad with low-scoring products.
+**Strong (−10 score for each missing)**
+- Top 3 competitor listings have < 300–500 reviews
+- Landed cost allows ≥ 3× markup
+- Clear differentiation angle (materials/formulation/bundling, not just logo)
+- Solves a specific searchable problem (not impulse-only)
+- First-order MOQ achievable under 500 units
+- No dominant national brand controlling the category
+
+**Nice-to-have (+5 score for each present)**
+- Selling price ≥ $50
+- Giftable product
+- No patent / trademark conflicts
+- Simple manufacturing (no electronics, food certs, kid compliance)
+
+**Score formula**: base 50 if must-haves pass → apply strong penalties → apply nice-to-have bonuses → floor 0, cap 100.
+
+**Verdict**: ≥ 75 → "Investigate", 60–74 → "Watch", < 60 or any must-have failed → dropped.
+
+**Output limit: max 5 products per weekly run.** Take top 5 by score. If fewer pass, output only those — never pad.
+
+Phase 2.1 (heuristic) evaluates 6/6 must-haves, 2/6 strong items (3× markup, MOQ), 3/4 nice-to-haves (price ≥$50, giftable, simple mfg). The rest are deferred to Phase 2 (Claude).
 
 ## Notion database schema
 Each product page must have these properties:

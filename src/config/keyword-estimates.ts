@@ -6,6 +6,10 @@ export interface KeywordEstimate {
   weight_kg: number;
   has_recurring_purchase: boolean;
   cross_sell_opportunities: string[];
+  is_evergreen: boolean;
+  is_giftable: boolean;
+  is_simple_to_manufacture: boolean;
+  est_moq: number;
 }
 
 export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
@@ -17,6 +21,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.4,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["face mask therapy", "skin serum", "collagen supplement"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "neck traction device": {
     niche: "health",
@@ -26,6 +34,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.3,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["cervical pillow", "back posture corrector", "heating pad"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "knee compression sleeve": {
     niche: "health",
@@ -35,6 +47,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.15,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["ankle brace", "resistance bands", "joint supplement"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "back posture corrector": {
     niche: "health",
@@ -44,6 +60,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.2,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["lumbar support pillow", "ergonomic wrist rest", "under desk foot rest"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "cervical neck stretcher": {
     niche: "health",
@@ -53,6 +73,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.25,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["neck traction device", "heating pad", "cervical pillow"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "trigger point massage tool": {
     niche: "health",
@@ -62,6 +86,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.3,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["acupressure mat set", "fascia gun mini", "massage oil"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "fascia gun mini": {
     niche: "health",
@@ -71,6 +99,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.45,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["massage gun attachment heads", "resistance loop bands set", "muscle cream"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "eye massager electric": {
     niche: "health",
@@ -80,6 +112,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.35,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["eye cream", "blue light glasses", "sleep mask"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "led face mask therapy": {
     niche: "health",
@@ -89,6 +125,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.35,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["skin serum", "red light therapy device", "collagen supplement"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "microcurrent face lifting device": {
     niche: "health",
@@ -98,6 +138,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.2,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["conductive gel", "skin serum", "led face mask therapy"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "ice globes face roller": {
     niche: "health",
@@ -107,6 +151,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.15,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["face serum", "gua sha tool", "jade roller"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "blackhead remover vacuum": {
     niche: "health",
@@ -116,6 +164,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.2,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["pore strips", "sonic facial cleanser", "face mask"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "sonic facial cleanser": {
     niche: "health",
@@ -125,6 +177,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.2,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["replacement brush heads", "face wash", "toner"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "nail care electric drill": {
     niche: "health",
@@ -134,6 +190,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.25,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["nail drill bits set", "nail lamp uv", "nail polish gel"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "resistance loop bands set": {
     niche: "fitness",
@@ -143,6 +203,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.3,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["ab wheel roller core", "jump rope weighted", "workout gloves"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "ab wheel roller core": {
     niche: "fitness",
@@ -152,6 +216,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.5,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["resistance loop bands set", "jump rope weighted", "gym mat"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "grip strength trainer": {
     niche: "fitness",
@@ -161,6 +229,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.15,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["wrist wraps", "resistance loop bands set", "hand therapy putty"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "acupressure mat set": {
     niche: "fitness",
@@ -170,6 +242,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.5,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["trigger point massage tool", "yoga strap", "foam roller"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "cold plunge portable": {
     niche: "fitness",
@@ -179,6 +255,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 2.5,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["sauna blanket infrared", "recovery supplement", "cold therapy gel pack"],
+    is_evergreen: false,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "sauna blanket infrared": {
     niche: "fitness",
@@ -188,6 +268,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 2.0,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["cold plunge portable", "detox supplement", "workout towel"],
+    is_evergreen: false,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "vacuum seal food bags": {
     niche: "home",
@@ -197,6 +281,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.3,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["vacuum seal machine", "silicone stretch lids", "pantry organizer"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "over door organizer hooks": {
     niche: "home",
@@ -206,6 +294,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.4,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["drawer dividers set", "shoe rack", "closet organizer"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "drawer dividers set": {
     niche: "home",
@@ -215,6 +307,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.35,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["over door organizer hooks", "label maker", "storage bins"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "silicone stretch lids": {
     niche: "home",
@@ -224,6 +320,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.2,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["vacuum seal food bags", "reusable shopping bags folding", "beeswax food wrap"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "herb stripper kitchen tool": {
     niche: "home",
@@ -233,6 +333,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.1,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["spice rack magnetic", "digital kitchen scale", "herb scissors"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "spice rack magnetic": {
     niche: "home",
@@ -242,6 +346,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.5,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["herb stripper kitchen tool", "digital kitchen scale", "wall-mount shelves"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "digital kitchen scale": {
     niche: "home",
@@ -251,6 +359,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.4,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["spice rack magnetic", "meal prep containers", "food thermometer"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "monitor riser stand": {
     niche: "office",
@@ -260,6 +372,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.8,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["cable management clips", "desk pad leather mat", "laptop stand portable"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "cable management clips": {
     niche: "office",
@@ -269,6 +385,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.1,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["desk pad leather mat", "monitor riser stand", "cable sleeve organizer"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "ergonomic wrist rest": {
     niche: "office",
@@ -278,6 +398,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.25,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["desk pad leather mat", "blue light glasses", "under desk foot rest"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "laptop stand portable": {
     niche: "office",
@@ -287,6 +411,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.35,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["monitor riser stand", "cable management clips", "desk pad leather mat"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "under desk foot rest": {
     niche: "office",
@@ -296,6 +424,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.5,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["ergonomic wrist rest", "back posture corrector", "lumbar support pillow"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "blue light glasses": {
     niche: "office",
@@ -305,6 +437,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.1,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["eye massager electric", "desk pad leather mat", "screen privacy filter"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "desk pad leather mat": {
     niche: "office",
@@ -314,6 +450,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.4,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["cable management clips", "ergonomic wrist rest", "monitor riser stand"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "compression packing cubes": {
     niche: "travel",
@@ -323,6 +463,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.25,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["travel jewelry organizer", "neck wallet rfid", "portable luggage scale"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "travel jewelry organizer": {
     niche: "travel",
@@ -332,6 +476,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.15,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["compression packing cubes", "neck wallet rfid", "travel cosmetic bag"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "portable luggage scale": {
     niche: "travel",
@@ -341,6 +489,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.1,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["compression packing cubes", "travel jewelry organizer", "luggage tag"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: false,
+    est_moq: 300,
   },
   "neck wallet rfid": {
     niche: "travel",
@@ -350,6 +502,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.08,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["compression packing cubes", "travel jewelry organizer", "money belt"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "reusable shopping bags folding": {
     niche: "home",
@@ -359,6 +515,10 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.15,
     has_recurring_purchase: true,
     cross_sell_opportunities: ["silicone stretch lids", "vacuum seal food bags", "produce mesh bags"],
+    is_evergreen: true,
+    is_giftable: false,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
   "jump rope weighted": {
     niche: "fitness",
@@ -368,5 +528,9 @@ export const KEYWORD_ESTIMATES: Record<string, KeywordEstimate> = {
     weight_kg: 0.45,
     has_recurring_purchase: false,
     cross_sell_opportunities: ["resistance loop bands set", "ab wheel roller core", "skipping mat"],
+    is_evergreen: true,
+    is_giftable: true,
+    is_simple_to_manufacture: true,
+    est_moq: 100,
   },
 };

@@ -33,27 +33,49 @@ function buildUserPrompt(keyword: string, ads: MetaAd[]): string {
 Here are ${ads.length} ads for this product:
 ${adBodies}
 
-Score this product 0-100 against these criteria:
-- Selling price above $30 (ideally $50+) [required]
-- Estimated gross margin ≥70% before ad spend [required]
-- Weight under 0.5kg (affects shipping cost to Lebanon) [required]
-- Not seasonal or trend-dependent [required]
-- Has recurring purchase potential [bonus]
-- Has 2-3 cross-sell product opportunities [bonus]
+Evaluate against this three-tier criteria framework:
 
-Products scoring below 60 are not viable for Lebanon private labeling.
+MUST-HAVE — if any fails, return score 0 and verdict "Skip":
+- Gross margin >= 70% before ad spend
+- Selling price >= $30
+- Weight < 0.5kg including packaging
+- Has natural repeat-purchase or reorder reason
+- Evergreen demand (stable Google Trends over 5 years, no spike-crash)
+- Supports at least 2-3 logical cross-sells or upsells over time
+
+STRONG (subtract 10 from score for EACH that's missing):
+- Top 3 competitor listings have <300-500 reviews (low review count = beatable)
+- Landed cost allows >=3x markup
+- Clear differentiation angle (materials, formulation, bundling — not just logo)
+- Solves a specific searchable problem (not impulse-only)
+- First-order MOQ achievable under 500 units
+- No dominant national brand controlling the category
+
+NICE-TO-HAVE (add 5 to score for EACH that applies):
+- Selling price >= $50
+- Giftable product
+- No patent/trademark conflicts apparent
+- Simple manufacturing (no electronics, food certs, kid compliance)
+
+Start scoring at 50 if all must-haves pass, then apply strong penalties and nice-to-have bonuses. Floor at 0, cap at 100.
 
 Respond with ONLY this JSON (no markdown):
 {
   "product_name": "specific product name",
   "niche": "health/fitness/home/office/travel/other",
   "score": 0-100,
+  "verdict_override": "Skip" | null,
   "selling_price_usd": estimated retail price in USD,
   "alibaba_cost_range": "estimated range e.g. $3-8",
   "estimated_margin_pct": estimated margin as integer 0-100,
   "weight_kg": estimated weight as decimal,
-  "has_recurring_purchase": true/false,
-  "cross_sell_opportunities": ["item1", "item2"],
+  "has_recurring_purchase": true | false,
+  "cross_sell_opportunities": ["item1", "item2", "item3"],
+  "criteria_breakdown": {
+    "must_have_failures": ["list of failed must-haves, empty array if all passed"],
+    "strong_missing": ["list of missing strong items"],
+    "nice_to_have_present": ["list of applicable nice-to-haves"]
+  },
   "score_rationale": "2-3 sentence explanation"
 }`;
 }
@@ -62,12 +84,18 @@ interface ClaudeProductResponse {
   product_name: string;
   niche: string;
   score: number;
+  verdict_override: "Skip" | null;
   selling_price_usd: number;
   alibaba_cost_range: string;
   estimated_margin_pct: number;
   weight_kg: number;
   has_recurring_purchase: boolean;
   cross_sell_opportunities: string[];
+  criteria_breakdown: {
+    must_have_failures: string[];
+    strong_missing: string[];
+    nice_to_have_present: string[];
+  };
   score_rationale: string;
 }
 
@@ -117,6 +145,20 @@ async function scoreProductGroup(
   const parsed = parseClaudeResponse(rawResponse, keyword);
   if (!parsed) return null;
 
+  if (parsed.verdict_override === "Skip" || parsed.score === 0) {
+    log.info(`Rejected "${keyword}" — must-have failure`, {
+      failures: parsed.criteria_breakdown?.must_have_failures ?? [],
+    });
+    return null;
+  }
+
+  const breakdown = parsed.criteria_breakdown ?? {
+    must_have_failures: [],
+    strong_missing: [],
+    nice_to_have_present: [],
+  };
+  const enrichedRationale = `${parsed.score_rationale} | strong missing: [${breakdown.strong_missing.join(", ") || "none"}] | nice-to-haves: [${breakdown.nice_to_have_present.join(", ") || "none"}]`;
+
   const candidate: Omit<ProductCandidate, 'verdict'> = {
     product_name: parsed.product_name,
     niche: parsed.niche,
@@ -130,7 +172,7 @@ async function scoreProductGroup(
     cross_sell_opportunities: parsed.cross_sell_opportunities,
     source_ads: ads,
     alibaba_suppliers: [],
-    score_rationale: parsed.score_rationale,
+    score_rationale: enrichedRationale,
   };
 
   log.info(`Scored "${parsed.product_name}"`, {
