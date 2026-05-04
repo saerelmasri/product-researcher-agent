@@ -109,11 +109,12 @@ function mapRawToMetaAd(raw: MetaAdLibraryRawAd, searchTerm: string): MetaAd | n
 async function fetchAdsForKeyword(
   keyword: string,
   token: string,
+  countries: string[] = REACHED_COUNTRIES,
 ): Promise<MetaAdLibraryRawAd[]> {
   const params = {
     access_token: token,
     ad_type: "ALL",
-    ad_reached_countries: JSON.stringify(REACHED_COUNTRIES),
+    ad_reached_countries: JSON.stringify(countries),
     ad_active_status: "ACTIVE",
     search_terms: keyword,
     fields: [
