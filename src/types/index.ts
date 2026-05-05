@@ -1,3 +1,28 @@
+// ── Flow A types ──────────────────────────────────────────────────────────────
+
+export interface CandidateNiche {
+  niche: string;
+  examples: string[];
+  privateLabelViable: string;
+  lebanonFit: number; // 1–5
+  alibabaPrice: string;
+  sellingPrice: string;
+  reasoning: string;
+}
+
+export type TrendStatus = "RISING" | "STABLE" | "DECLINING";
+
+export interface ValidatedNiche {
+  niche: string;
+  status: TrendStatus;
+  change: string; // e.g. "+23%" or "-5%"
+}
+
+// niche name → array of keyword strings
+export type DiscoveredKeywords = Record<string, string[]>;
+
+// ── Flow B types ───────────────────────────────────────────────────────────────
+
 export interface MetaAdRange {
   lower_bound: number;
   upper_bound: number;
@@ -41,16 +66,20 @@ export interface RunState {
 export interface AlibabaSupplier {
   name: string;
   stars: number | null;
+  review_count: number;
   certifications: string[];
+  trade_assurance: boolean;
+  verified: boolean;
   price_per_unit: string;
   moq: string;
   url: string;
 }
 
 export interface CustomerObjection {
-  objection: string;
-  why_it_matters: string;
-  how_to_counter: string;
+  category: "Shipping" | "Quality" | "Price" | "Trust";
+  customer_voice: string;       // written as the Lebanese customer would say it
+  why_it_matters_in_lebanon: string;
+  counter: string;              // concrete action for the product page / ad
 }
 
 export interface ProductCandidate {
@@ -67,6 +96,7 @@ export interface ProductCandidate {
   cross_sell_opportunities: string[];
   source_ads: MetaAd[];
   alibaba_suppliers: AlibabaSupplier[];
+  alibaba_search_url: string;
   score_rationale: string;
 }
 
@@ -78,5 +108,7 @@ export interface ProductReport extends ProductCandidate {
   week_generated: string;
 }
 
-export type Phase2Output = ProductCandidate[];
-export type Phase5Output = ProductReport[];
+export type Phase2Output = ProductCandidate[]; // legacy alias — output of Phase 3 filter
+export type Phase5Output = ProductReport[];    // legacy alias — output of Phase 6 analysis
+export type Phase3Output = ProductCandidate[];
+export type Phase6Output = ProductReport[];

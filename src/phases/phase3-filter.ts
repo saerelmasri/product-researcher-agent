@@ -172,6 +172,7 @@ async function scoreProductGroup(
     cross_sell_opportunities: parsed.cross_sell_opportunities,
     source_ads: ads,
     alibaba_suppliers: [],
+    alibaba_search_url: "",
     score_rationale: enrichedRationale,
   };
 

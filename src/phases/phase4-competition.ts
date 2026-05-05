@@ -4,7 +4,7 @@ import * as path from "path";
 
 import { ProductCandidate } from "../types";
 import { log } from "../utils/logger";
-import { fetchAdsForKeyword } from "./phase1-scraper";
+import { fetchAdsForKeyword } from "./phase2-scraper";
 
 dotenv.config();
 

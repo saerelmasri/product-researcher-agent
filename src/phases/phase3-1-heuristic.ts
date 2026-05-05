@@ -189,6 +189,7 @@ async function main(): Promise<void> {
       cross_sell_opportunities: estimate.cross_sell_opportunities,
       source_ads: groupAds,
       alibaba_suppliers: [],
+      alibaba_search_url: "",
       score_rationale: `Heuristic stub (must-haves passed): ${breakdown.rationaleParts.join(" + ")} = ${breakdown.total}`,
     };
 

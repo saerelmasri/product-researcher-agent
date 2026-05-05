@@ -5,6 +5,7 @@ import * as path from "path";
 
 import { KEYWORDS_2025, KEYWORDS_PER_RUN } from "../config/keywords";
 import {
+  DiscoveredKeywords,
   MetaAd,
   MetaAdLibraryRawAd,
   MetaAdLibraryResponse,
@@ -20,11 +21,11 @@ const META_API_URL = "https://graph.facebook.com/v19.0/ads_archive";
 const REACHED_COUNTRIES = ["US", "GB", "CA", "AU"];
 const PER_KEYWORD_LIMIT = 25;
 const REQUEST_DELAY_MS = 1500;
-const MIN_DAYS_RUNNING = 30;
 
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
 const RUN_STATE_PATH = path.join(DATA_DIR, ".run-state.json");
 const ADS_OUTPUT_PATH = path.join(DATA_DIR, "ads.json");
+const DISCOVERED_KEYWORDS_PATH = path.join(DATA_DIR, "discovered-keywords.json");
 
 function loadEnvOrThrow(): { token: string } {
   const token = process.env.META_ACCESS_TOKEN?.trim();
@@ -61,15 +62,40 @@ function writeRunState(state: RunState): void {
   fs.writeFileSync(RUN_STATE_PATH, JSON.stringify(state, null, 2), "utf-8");
 }
 
+function loadDiscoveredKeywords(): string[] | null {
+  if (!fs.existsSync(DISCOVERED_KEYWORDS_PATH)) return null;
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(DISCOVERED_KEYWORDS_PATH, "utf-8"),
+    ) as DiscoveredKeywords;
+    // Flatten all niche keyword arrays into one list
+    const all = Object.values(raw).flat().filter(Boolean);
+    if (all.length === 0) return null;
+    log.info(`Using ${all.length} keywords from discovered-keywords.json (Flow A output)`);
+    return all;
+  } catch {
+    log.warn("Could not parse discovered-keywords.json — falling back to static list");
+    return null;
+  }
+}
+
 function getKeywordSliceForThisWeek(): { keywords: string[]; weekIndex: number } {
   const state = readRunState();
+
+  // Prefer Flow A output — use ALL discovered keywords (no rotation; Flow A controls the list)
+  const discovered = loadDiscoveredKeywords();
+  if (discovered) {
+    return { keywords: discovered, weekIndex: state.weekIndex };
+  }
+
+  // Fallback: rotate through static KEYWORDS_2025
+  log.info("No discovered-keywords.json found — falling back to static keyword list");
   const totalSlices = Math.ceil(KEYWORDS_2025.length / KEYWORDS_PER_RUN);
   const slot = ((state.weekIndex % totalSlices) + totalSlices) % totalSlices;
   const start = slot * KEYWORDS_PER_RUN;
   let keywords = KEYWORDS_2025.slice(start, start + KEYWORDS_PER_RUN);
   if (keywords.length < KEYWORDS_PER_RUN) {
-    const missing = KEYWORDS_PER_RUN - keywords.length;
-    keywords = keywords.concat(KEYWORDS_2025.slice(0, missing));
+    keywords = keywords.concat(KEYWORDS_2025.slice(0, KEYWORDS_PER_RUN - keywords.length));
   }
   return { keywords, weekIndex: state.weekIndex };
 }
@@ -152,22 +178,11 @@ async function fetchAdsForKeyword(
   }
 }
 
-function isRunningLongEnough(ad: MetaAd, now: Date): boolean {
-  if (!ad.ad_delivery_start_time) return false;
-  const start = new Date(ad.ad_delivery_start_time);
-  if (Number.isNaN(start.getTime())) return false;
-  const ageMs = now.getTime() - start.getTime();
-  const ageDays = ageMs / (1000 * 60 * 60 * 24);
-  return ageDays >= MIN_DAYS_RUNNING;
-}
-
 function filterAds(ads: MetaAd[]): MetaAd[] {
-  const now = new Date();
   const seen = new Set<string>();
   const out: MetaAd[] = [];
   for (const ad of ads) {
     if (!ad.ad_creative_body) continue;
-    if (!isRunningLongEnough(ad, now)) continue;
     if (seen.has(ad.ad_id)) continue;
     seen.add(ad.ad_id);
     out.push(ad);

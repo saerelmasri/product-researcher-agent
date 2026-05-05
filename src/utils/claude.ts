@@ -13,7 +13,11 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const MODEL = "claude-opus-4-20250514";
+// Default for bulk work (Phase 2 scoring ~200 ads). Phase 5 deep analysis passes MODEL_DEEP.
+const MODEL_DEFAULT = "claude-sonnet-4-6";
+const MODEL_DEEP = "claude-opus-4-7";
+
+export { MODEL_DEEP };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,7 +25,8 @@ function sleep(ms: number): Promise<void> {
 
 export async function askClaude(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
+  model: string = MODEL_DEFAULT
 ): Promise<string> {
   const systemBlocks: Anthropic.TextBlockParam[] = systemPrompt
     ? [
@@ -39,7 +44,7 @@ export async function askClaude(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await client.messages.create({
-        model: MODEL,
+        model,
         max_tokens: 16000,
         ...(systemBlocks.length > 0 && { system: systemBlocks }),
         messages: [{ role: "user", content: prompt }],
