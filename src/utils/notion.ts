@@ -75,14 +75,15 @@ export async function writeNichesToNotion(
       await notion.pages.create({
         parent: { database_id: dbId },
         properties: {
-          Name: { title: [{ text: { content: n.niche } }] },
-          Status: { select: { name: "Active" } },
-          "Lebanon Fit": { number: n.lebanonFit },
+          Name:                  { title: [{ text: { content: n.niche } }] },
+          Status:                { select: { name: "Active" } },
+          "Price Range":         { rich_text: [{ text: { content: n.priceRange } }] },
+          "Upsell / Repeat":     { rich_text: [{ text: { content: n.upsellOrRepeat } }] },
+          "Lebanon Import Risk": { select: { name: n.lebanonImportRisk.charAt(0).toUpperCase() + n.lebanonImportRisk.slice(1) } },
+          "Lebanon Import Notes":{ rich_text: [{ text: { content: n.lebanonImportNotes } }] },
           "Trend Status": {
             select: { name: trend?.status ?? "Stable" },
           },
-          "Alibaba Price": { rich_text: [{ text: { content: n.alibabaPrice } }] },
-          "Selling Price": { rich_text: [{ text: { content: n.sellingPrice } }] },
           "Created At": { date: { start: new Date().toISOString().split("T")[0] } },
         },
       });

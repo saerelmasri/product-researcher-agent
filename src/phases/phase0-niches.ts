@@ -12,45 +12,48 @@ dotenv.config();
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
 const OUTPUT_PATH = path.join(DATA_DIR, "candidate-niches.json");
 
-const SYSTEM_PROMPT = `You are a private label product research specialist for the Lebanese market.
-You respond with valid JSON only — no markdown, no explanation, no code fences.`;
+const SYSTEM_PROMPT = `You are a private label product research specialist focused on US DTC market winners that are also importable to Lebanon. You respond with valid JSON only — no markdown, no explanation, no code fences.`;
 
-const USER_PROMPT = `Generate exactly 12 candidate niches for private label products to sell in Lebanon.
+const USER_PROMPT = `Generate exactly 8 candidate niches for private label products. Goal: identify niches where US-based DTC brands are currently scaling on Meta ads, that I can source generically and sell into Lebanon.
 
-Constraints — every niche must satisfy ALL of these:
-- Target selling price: $15–$60 USD
-- MOQ under 300 units on Alibaba
-- Shippable to Lebanon without special permits or certifications
-- Generic product with no dominant brand — easy to rebrand
-- NOT: food, supplements, electronics requiring CE/FCC certification, cosmetics requiring CPNP registration, children's toys requiring safety certs
-- Must have repeat purchase potential OR strong upsell chain
+A niche is a broad market CATEGORY, not a specific product.
+Good niche examples: "Car Accessories", "Home Office Ergonomics", "Pet Accessories", "Travel Gear", "Sleep & Recovery", "EDC (Everyday Carry)".
+Bad examples (too specific): "Car Seat Organizer", "Laptop Stand Riser", "Magnetic Phone Mount".
 
-Lebanon market context:
-- Urban middle-class buyer in Beirut and major cities
-- Price-sensitive but willing to pay for perceived quality
-- Influenced by Gulf (KSA, UAE) and European trends
-- High car ownership — car accessories are strong
-- Growing remote work culture — home office products trending
-- Frequent power cuts — anything related to backup power or efficiency
-- Strong social media influence (Instagram, TikTok)
+Hard constraints — every niche must satisfy ALL:
+- Typical retail price $15–$60 USD
+- Generic category with strong private label history (no patent moats, no dominant single brand globally)
+- No mandatory certifications for import (exclude: ingestibles, supplements, cosmetics with active ingredients, electronics requiring CE/FCC for primary function, kids' toys under 3yr, medical devices)
+- Physically robust enough for COD delivery (not fragile, not perishable, not heavily personalized — because 15–30% of COD orders get refused and returned to stock)
+- AOV viable at $15+ retail (excludes ultra-cheap impulse items where COD return costs eat margin)
 
-IMPORTANT DEFINITION — A niche is a broad market CATEGORY, not a specific product.
-Good niche examples: "Car Accessories", "Home Office", "Emergency Power", "Eco Kitchen", "Personal Safety", "Baby & Toddler", "Pet Accessories", "Travel Gear".
-Bad examples (too specific — these are products, not niches): "Car Seat Organizer", "Laptop Stand Riser", "UV Water Purifier Wand".
-The 'examples' field is where specific products go. The 'niche' field is the broad category they belong to.
+Soft priorities (not hard filters, but stronger niches hit more of these):
+- Visible scaling on US Meta ads in the past 12 months
+- Repeat purchase OR natural upsell chain within the category
+- Visual/demo-friendly product (works well in short-form video ads)
+- Solves a problem or triggers an emotion — not just "nice to have"
 
-Respond with a JSON array of exactly 12 objects. Each object must follow this exact schema:
+Lebanon import context (informational, affects the lebanonImportRisk field):
+- Trilingual market (Arabic/French/English) — products with English-only packaging are fine
+- Heavy COD dependence due to post-2019 banking situation
+- Frequent power cuts make backup-power and efficiency-related products resonate
+- Strong Gulf and European trend influence
+- Car ownership is high; remote work is growing
+
+Return JSON in this exact schema:
 {
-  "niche": "broad market category (1–3 words, e.g. 'Car Accessories', 'Home Office', 'Emergency Power')",
-  "examples": ["specific product 1", "specific product 2", "specific product 3"],
-  "privateLabelViable": "one sentence — why this category is easy to private label",
-  "lebanonFit": 4,
-  "alibabaPrice": "$3–$8",
-  "sellingPrice": "$25–$45",
-  "reasoning": "one sentence — why this category fits Lebanon specifically"
-}
-
-Prioritise categories with: no dominant national brand in Lebanon, clear private label angle, multiple rebrandable products within the category.`;
+  "niches": [
+    {
+      "niche": "string — broad category name",
+      "rationale": "string — 2-3 sentences on why this niche is winning on US Meta right now and why it's private-label-friendly",
+      "examples": ["3-5 specific product types within the niche"],
+      "priceRange": "string — e.g. '$20-45'",
+      "upsellOrRepeat": "string — describe the repeat/upsell mechanic",
+      "lebanonImportRisk": "low | medium | high",
+      "lebanonImportNotes": "string — one sentence on import/COD viability for Lebanon"
+    }
+  ]
+}`;
 
 async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -71,7 +74,7 @@ async function main(): Promise<void> {
     log.info("No existing niches found in Notion (or Notion not configured) — generating fresh");
   }
 
-  log.info("Calling Claude to generate 12 candidate niches...");
+  log.info("Calling Claude to generate 8 candidate niches...");
   let raw: string;
   try {
     raw = await askClaude(USER_PROMPT, SYSTEM_PROMPT);
@@ -83,8 +86,10 @@ async function main(): Promise<void> {
   let niches: CandidateNiche[];
   try {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    niches = JSON.parse(cleaned) as CandidateNiche[];
-    if (!Array.isArray(niches)) throw new Error("Response is not an array");
+    const parsed = JSON.parse(cleaned) as { niches?: CandidateNiche[] } | CandidateNiche[];
+    // Handle both { niches: [...] } wrapper and flat array
+    niches = Array.isArray(parsed) ? parsed : (parsed.niches ?? []);
+    if (!Array.isArray(niches) || niches.length === 0) throw new Error("No niches in response");
   } catch (err) {
     log.error("Failed to parse Claude response", {
       error: (err as Error).message,
@@ -120,7 +125,7 @@ async function main(): Promise<void> {
   log.info("Phase 0 complete. Run `npm run phase0-5` next to validate with Google Trends.");
   log.info("New niches:");
   newNiches.forEach((n) => {
-    log.info(`  • ${n.niche} [Lebanon fit: ${n.lebanonFit}/5] — ${n.reasoning}`);
+    log.info(`  • ${n.niche} [import risk: ${n.lebanonImportRisk}] — ${n.rationale.slice(0, 100)}...`);
   });
 }
 

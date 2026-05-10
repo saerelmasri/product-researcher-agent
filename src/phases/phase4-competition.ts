@@ -38,7 +38,7 @@ async function main(): Promise<void> {
 
   if (!fs.existsSync(CANDIDATES_PATH)) {
     log.error(
-      `data/candidates.json not found at ${CANDIDATES_PATH}. Run Phase 2 or Phase 2.1 first.`,
+      `data/candidates.json not found at ${CANDIDATES_PATH}. Run Phase 3 or Phase 3.1 first.`,
     );
     process.exit(1);
   }
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   }
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    log.error("data/candidates.json is empty. Run Phase 2 or Phase 2.1 first.");
+    log.error("data/candidates.json is empty. Run Phase 3 or Phase 3.1 first.");
     process.exit(1);
   }
 
@@ -61,20 +61,21 @@ async function main(): Promise<void> {
 
   for (let i = 0; i < candidates.length; i++) {
     const candidate = candidates[i];
-    log.info(`Checking Lebanon competition for "${candidate.product_name}"`);
+    const searchTerm = candidate.product_analysis?.product_name ?? candidate.page_name;
+    log.info(`Checking Lebanon competition for "${searchTerm}"`);
 
     try {
-      const ads = await fetchAdsForKeyword(candidate.product_name, token, LEBANON_COUNTRIES);
+      const { ads } = await fetchAdsForKeyword(searchTerm, token, LEBANON_COUNTRIES);
       const uniqueAdvertisers = new Set(
         ads.map((a) => a.page_name).filter((name): name is string => Boolean(name)),
       ).size;
       const level = classifyCompetition(uniqueAdvertisers);
       candidate.lebanon_competition = level;
       log.info(
-        `  "${candidate.product_name}": ${ads.length} ads from ${uniqueAdvertisers} advertisers → ${level}`,
+        `  "${searchTerm}": ${ads.length} ads from ${uniqueAdvertisers} advertisers → ${level}`,
       );
     } catch (err) {
-      log.warn(`Failed to check competition for "${candidate.product_name}" — leaving as Unknown`, {
+      log.warn(`Failed to check competition for "${searchTerm}" — leaving as Unknown`, {
         error: (err as Error).message,
       });
     }
@@ -86,9 +87,10 @@ async function main(): Promise<void> {
 
   fs.writeFileSync(CANDIDATES_PATH, JSON.stringify(candidates, null, 2), "utf-8");
 
-  log.info("Phase 3 summary:");
+  log.info("Phase 4 summary:");
   candidates.forEach((c) => {
-    log.info(`  ${c.product_name} — ${c.lebanon_competition}`);
+    const label = c.product_analysis?.product_name ?? c.page_name;
+    log.info(`  ${label} — ${c.lebanon_competition}`);
   });
   log.info(`Updated ${candidates.length} candidates in ${CANDIDATES_PATH}`);
 }

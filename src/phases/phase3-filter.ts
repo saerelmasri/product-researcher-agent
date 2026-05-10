@@ -2,114 +2,184 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
-import { MetaAd, Phase1Output, Phase2Output, ProductCandidate } from "../types";
+import {
+  BrandRecord,
+  MetaAd,
+  Phase2Output,
+  ProductAnalysis,
+  ProductCandidate,
+  ScalingBreakdown,
+} from "../types";
 import { log } from "../utils/logger";
 
 dotenv.config();
 
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
+const BRANDS_INPUT_PATH = path.join(DATA_DIR, "brands.json");
 const ADS_INPUT_PATH = path.join(DATA_DIR, "ads.json");
 const CANDIDATES_OUTPUT_PATH = path.join(DATA_DIR, "candidates.json");
 
-const MIN_SCORE = 60;
-const MAX_CANDIDATES = 5;
-const BETWEEN_CALLS_DELAY_MS = 1500;
+const TOP_N_BRANDS_TO_ANALYZE = 30;
+const PARALLEL_BATCH_SIZE = 5;
+const SCALING_SCORE_FORMULA_VERSION = "v1";
+
+// ── Prompts ────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT =
-  "You are a product research analyst specializing in identifying private label opportunities for the Lebanese market. You evaluate products based on specific criteria and always respond with valid JSON only — no markdown, no explanation.";
+  "You are a DTC product analyst. You evaluate brands running ads on Meta to identify private label opportunities. You analyze ONLY what is visible in the ad creative text provided — you do not estimate costs, margins, weights, or competitor data, because you cannot verify those from ads. You respond with valid JSON only — no markdown, no explanation, no code fences.";
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildUserPrompt(keyword: string, ads: MetaAd[]): string {
+function buildUserPrompt(brand: BrandRecord, ads: MetaAd[]): string {
   const adBodies = ads
     .map((a) => a.ad_creative_body.trim())
     .filter(Boolean)
     .join("\n---\n");
 
-  return `Analyze this product for private label potential in Lebanon. The product was identified from this ad keyword: "${keyword}"
+  return `Analyze this brand running ads on US Meta (Facebook/Instagram).
 
-Here are ${ads.length} ads for this product:
+BRAND CONTEXT:
+- Page name: ${brand.page_name}
+- Total ads in dataset: ${brand.ad_count}
+- Active ads: ${brand.active_ad_count}
+- Longest-running ad: ${brand.max_days_running} days
+- Average ad longevity: ${brand.avg_days_running} days
+- Niches this brand was surfaced under: ${brand.niches_hit.join(", ") || "unknown"}
+
+AD CREATIVES (each separated by ---):
 ${adBodies}
 
-Evaluate against this three-tier criteria framework:
+YOUR TASK:
+Based ONLY on what you can read in the ad creatives above, analyze this brand's product as a potential private label opportunity. Do not guess at costs, weights, margins, MOQs, supplier data, or competitor metrics — those will be verified manually later.
 
-MUST-HAVE — if any fails, return score 0 and verdict "Skip":
-- Gross margin >= 70% before ad spend
-- Selling price >= $30
-- Weight < 0.5kg including packaging
-- Has natural repeat-purchase or reorder reason
-- Evergreen demand (stable Google Trends over 5 years, no spike-crash)
-- Supports at least 2-3 logical cross-sells or upsells over time
+Return JSON in this exact schema:
 
-STRONG (subtract 10 from score for EACH that's missing):
-- Top 3 competitor listings have <300-500 reviews (low review count = beatable)
-- Landed cost allows >=3x markup
-- Clear differentiation angle (materials, formulation, bundling — not just logo)
-- Solves a specific searchable problem (not impulse-only)
-- First-order MOQ achievable under 500 units
-- No dominant national brand controlling the category
-
-NICE-TO-HAVE (add 5 to score for EACH that applies):
-- Selling price >= $50
-- Giftable product
-- No patent/trademark conflicts apparent
-- Simple manufacturing (no electronics, food certs, kid compliance)
-
-Start scoring at 50 if all must-haves pass, then apply strong penalties and nice-to-have bonuses. Floor at 0, cap at 100.
-
-Respond with ONLY this JSON (no markdown):
 {
-  "product_name": "specific product name",
-  "niche": "health/fitness/home/office/travel/other",
-  "score": 0-100,
-  "verdict_override": "Skip" | null,
-  "selling_price_usd": estimated retail price in USD,
-  "alibaba_cost_range": "estimated range e.g. $3-8",
-  "estimated_margin_pct": estimated margin as integer 0-100,
-  "weight_kg": estimated weight as decimal,
-  "has_recurring_purchase": true | false,
-  "cross_sell_opportunities": ["item1", "item2", "item3"],
-  "criteria_breakdown": {
-    "must_have_failures": ["list of failed must-haves, empty array if all passed"],
-    "strong_missing": ["list of missing strong items"],
-    "nice_to_have_present": ["list of applicable nice-to-haves"]
-  },
-  "score_rationale": "2-3 sentence explanation"
-}`;
+  "product_name": "string — the specific product the brand is selling, in 2-5 words",
+  "product_description": "string — one sentence describing what the product does",
+  "category": "string — broad category (e.g. 'car accessories', 'home office', 'pet')",
+
+  "stated_price": "string or null — only fill if a price is explicitly mentioned in ad copy, otherwise null. Do NOT estimate.",
+
+  "problem_solved": "string — the specific problem the ads claim this product solves",
+  "main_hook": "string — the primary angle/hook the brand leads with across their ads",
+  "secondary_hooks": ["array of other angles used across ad variants, max 4"],
+
+  "appears_generic": true | false,
+  "appears_proprietary": true | false,
+  "generic_vs_proprietary_reasoning": "string — one sentence explaining your call. Generic = could be sourced from many suppliers and rebranded. Proprietary = patented mechanism, unique design, or brand-specific IP.",
+
+  "differentiation_angle": "string — what specifically makes THIS brand's version stand out in the ads (could be: hook, branding, bundle, demographic, use case). If undifferentiated, say so.",
+  "differentiation_copyable": true | false,
+
+  "single_product_brand": true | false | "unclear",
+  "brand_observations": "string — what the ad copy and page name suggest about the brand (single-product store, catalog brand, lifestyle brand, etc.)",
+
+  "private_label_fit": "high | medium | low",
+  "private_label_reasoning": "string — 1-2 sentences. High = generic product, copyable angle, no IP moat. Low = proprietary mechanism, brand-dependent appeal, or strong patent/trademark signal.",
+
+  "trend_or_evergreen": "trend | evergreen | unclear",
+  "trend_evergreen_reasoning": "string — one sentence. Look for language like 'viral', 'trending', 'TikTok made me', seasonal hooks, or fad-style urgency vs. timeless problem-solving.",
+
+  "red_flags": ["array of concerns visible in the ad copy — e.g. 'mentions FDA approval', 'patent pending language', 'celebrity endorsement', 'medical claims', 'requires certification', 'fragile product hints'. Empty array if none."],
+
+  "creative_quality_signal": "string — brief observation on the ad copy itself: is it polished/professional, scrappy/UGC-style, or template-driven? This signals the brand's marketing maturity.",
+
+  "notes_for_manual_review": "string — 1-2 sentences flagging anything specific you'd want a human to verify before sourcing this product. Be concrete."
 }
 
-interface ClaudeProductResponse {
-  product_name: string;
-  niche: string;
+CRITICAL RULES:
+- If a field cannot be determined from the ad creatives, use null, "unclear", or an empty array as appropriate. Do NOT guess.
+- Do not output any field not in the schema.
+- Do not include cost, weight, margin, MOQ, or competitor data anywhere.
+- Be skeptical: if ads make medical claims, mention FDA/CE/patents, or rely on celebrity faces, flag in red_flags.
+- "appears_generic" and "appears_proprietary" should usually NOT both be true. If genuinely ambiguous, set both false and explain in the reasoning field.`;
+}
+
+// ── Scaling score ──────────────────────────────────────────────────────────────
+
+function computeScalingScore(brand: BrandRecord): {
   score: number;
-  verdict_override: "Skip" | null;
-  selling_price_usd: number;
-  alibaba_cost_range: string;
-  estimated_margin_pct: number;
-  weight_kg: number;
-  has_recurring_purchase: boolean;
-  cross_sell_opportunities: string[];
-  criteria_breakdown: {
-    must_have_failures: string[];
-    strong_missing: string[];
-    nice_to_have_present: string[];
+  breakdown: ScalingBreakdown;
+} {
+  const raw =
+    brand.active_ad_count * 2 +
+    brand.max_days_running * 0.5 +
+    brand.ad_count * 1;
+  const score = Math.min(100, Math.round(raw));
+  return {
+    score,
+    breakdown: {
+      active_ad_count: brand.active_ad_count,
+      max_days_running: brand.max_days_running,
+      ad_count: brand.ad_count,
+      formula_version: SCALING_SCORE_FORMULA_VERSION,
+    },
   };
-  score_rationale: string;
 }
 
-function parseClaudeResponse(raw: string, keyword: string): ClaudeProductResponse | null {
+// ── Response parsing & validation ─────────────────────────────────────────────
+
+function validateProductAnalysis(obj: unknown): obj is ProductAnalysis {
+  if (typeof obj !== "object" || obj === null) return false;
+  const r = obj as Record<string, unknown>;
+
+  const requiredStrings: (keyof ProductAnalysis)[] = [
+    "product_name",
+    "product_description",
+    "category",
+    "problem_solved",
+    "main_hook",
+    "generic_vs_proprietary_reasoning",
+    "differentiation_angle",
+    "brand_observations",
+    "private_label_reasoning",
+    "trend_evergreen_reasoning",
+    "creative_quality_signal",
+    "notes_for_manual_review",
+  ];
+  for (const field of requiredStrings) {
+    if (typeof r[field] !== "string" || (r[field] as string).length === 0) return false;
+  }
+
+  if (r.stated_price !== null && typeof r.stated_price !== "string") return false;
+
+  if (!Array.isArray(r.secondary_hooks) || !r.secondary_hooks.every((x) => typeof x === "string"))
+    return false;
+  if (!Array.isArray(r.red_flags) || !r.red_flags.every((x) => typeof x === "string"))
+    return false;
+
+  if (typeof r.appears_generic !== "boolean") return false;
+  if (typeof r.appears_proprietary !== "boolean") return false;
+  if (typeof r.differentiation_copyable !== "boolean") return false;
+
+  if (
+    r.single_product_brand !== true &&
+    r.single_product_brand !== false &&
+    r.single_product_brand !== "unclear"
+  )
+    return false;
+
+  if (!["high", "medium", "low"].includes(r.private_label_fit as string)) return false;
+  if (!["trend", "evergreen", "unclear"].includes(r.trend_or_evergreen as string)) return false;
+
+  return true;
+}
+
+function parseClaudeResponse(raw: string, pageName: string): ProductAnalysis | null {
   try {
-    // Strip markdown code fences if Claude adds them despite instructions
     const cleaned = raw
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```$/i, "")
       .trim();
-    const parsed = JSON.parse(cleaned) as ClaudeProductResponse;
+    const parsed: unknown = JSON.parse(cleaned);
+    if (!validateProductAnalysis(parsed)) {
+      log.warn(`Response for "${pageName}" failed schema validation`, {
+        keys: typeof parsed === "object" && parsed !== null ? Object.keys(parsed) : [],
+      });
+      return null;
+    }
     return parsed;
   } catch (err) {
-    log.warn(`Failed to parse Claude response for keyword "${keyword}"`, {
+    log.warn(`Failed to parse Claude response for "${pageName}"`, {
       error: (err as Error).message,
       raw: raw.slice(0, 200),
     });
@@ -117,174 +187,264 @@ function parseClaudeResponse(raw: string, keyword: string): ClaudeProductRespons
   }
 }
 
-function assignVerdict(score: number): "Investigate" | "Watch" | "Skip" {
-  if (score >= 75) return "Investigate";
-  if (score >= 60) return "Watch";
-  return "Skip";
+// ── Per-brand analysis ─────────────────────────────────────────────────────────
+
+function buildManualReviewItems(analysis: ProductAnalysis): string[] {
+  const items: string[] = [];
+  if (analysis.notes_for_manual_review) {
+    items.push(analysis.notes_for_manual_review);
+  }
+  if (analysis.red_flags.length > 0) {
+    items.push(`Red flags: ${analysis.red_flags.join(", ")}`);
+  }
+  if (analysis.appears_proprietary) {
+    items.push("Appears proprietary — verify IP before sourcing");
+  }
+  return items;
 }
 
-async function scoreProductGroup(
-  keyword: string,
-  ads: MetaAd[],
+async function analyzeBrand(
+  brand: BrandRecord,
+  index: number,
+  total: number,
+  adMap: Map<string, MetaAd>,
+  { scaling_score, scaling_breakdown }: { scaling_score: number; scaling_breakdown: ScalingBreakdown },
   askClaude: (prompt: string, systemPrompt?: string) => Promise<string>,
-): Promise<Omit<ProductCandidate, 'verdict'> | null> {
-  log.info(`Scoring keyword group: "${keyword}"`, { adCount: ads.length });
+): Promise<ProductCandidate> {
+  const brandAds = brand.ad_ids
+    .map((id) => adMap.get(id))
+    .filter((a): a is MetaAd => a !== undefined && a.has_creative_text);
 
-  const prompt = buildUserPrompt(keyword, ads);
+  if (brandAds.length === 0) {
+    log.info(
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=skipped_no_text fit=null`,
+    );
+    return {
+      page_id: brand.page_id,
+      page_name: brand.page_name,
+      ad_count: brand.ad_count,
+      active_ad_count: brand.active_ad_count,
+      avg_days_running: brand.avg_days_running,
+      max_days_running: brand.max_days_running,
+      niches_hit: brand.niches_hit,
+      keywords_hit: brand.keywords_hit,
+      scaling_score,
+      scaling_breakdown,
+      product_analysis: null,
+      analysis_status: "skipped_no_text",
+      source_ad_ids: brand.ad_ids,
+      lebanon_competition: "Unknown",
+      alibaba_suppliers: [],
+      alibaba_search_url: "",
+      manual_review_needed: ["No ad text available — analysis skipped"],
+    };
+  }
+
+  const prompt = buildUserPrompt(brand, brandAds);
   let rawResponse: string;
 
   try {
     rawResponse = await askClaude(prompt, SYSTEM_PROMPT);
   } catch (err) {
-    log.warn(`Claude call failed for keyword "${keyword}"`, {
+    log.warn(`Claude call failed for "${brand.page_name}"`, {
       error: (err as Error).message,
     });
-    return null;
+    log.info(
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed fit=null`,
+    );
+    return {
+      page_id: brand.page_id,
+      page_name: brand.page_name,
+      ad_count: brand.ad_count,
+      active_ad_count: brand.active_ad_count,
+      avg_days_running: brand.avg_days_running,
+      max_days_running: brand.max_days_running,
+      niches_hit: brand.niches_hit,
+      keywords_hit: brand.keywords_hit,
+      scaling_score,
+      scaling_breakdown,
+      product_analysis: null,
+      analysis_status: "failed",
+      source_ad_ids: brand.ad_ids,
+      lebanon_competition: "Unknown",
+      alibaba_suppliers: [],
+      alibaba_search_url: "",
+      manual_review_needed: ["Claude API call failed — retry or review manually"],
+    };
   }
 
-  const parsed = parseClaudeResponse(rawResponse, keyword);
-  if (!parsed) return null;
+  const analysis = parseClaudeResponse(rawResponse, brand.page_name);
 
-  if (parsed.verdict_override === "Skip" || parsed.score === 0) {
-    log.info(`Rejected "${keyword}" — must-have failure`, {
-      failures: parsed.criteria_breakdown?.must_have_failures ?? [],
-    });
-    return null;
+  if (!analysis) {
+    log.info(
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed fit=null`,
+    );
+    return {
+      page_id: brand.page_id,
+      page_name: brand.page_name,
+      ad_count: brand.ad_count,
+      active_ad_count: brand.active_ad_count,
+      avg_days_running: brand.avg_days_running,
+      max_days_running: brand.max_days_running,
+      niches_hit: brand.niches_hit,
+      keywords_hit: brand.keywords_hit,
+      scaling_score,
+      scaling_breakdown,
+      product_analysis: null,
+      analysis_status: "failed",
+      source_ad_ids: brand.ad_ids,
+      lebanon_competition: "Unknown",
+      alibaba_suppliers: [],
+      alibaba_search_url: "",
+      manual_review_needed: ["Claude response failed validation — retry or review manually"],
+    };
   }
 
-  const breakdown = parsed.criteria_breakdown ?? {
-    must_have_failures: [],
-    strong_missing: [],
-    nice_to_have_present: [],
-  };
-  const enrichedRationale = `${parsed.score_rationale} | strong missing: [${breakdown.strong_missing.join(", ") || "none"}] | nice-to-haves: [${breakdown.nice_to_have_present.join(", ") || "none"}]`;
+  log.info(
+    `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=success fit=${analysis.private_label_fit}`,
+  );
 
-  const candidate: Omit<ProductCandidate, 'verdict'> = {
-    product_name: parsed.product_name,
-    niche: parsed.niche,
-    score: parsed.score,
-    selling_price_usd: parsed.selling_price_usd,
-    alibaba_cost_range: parsed.alibaba_cost_range,
-    estimated_margin_pct: parsed.estimated_margin_pct,
-    weight_kg: parsed.weight_kg,
+  return {
+    page_id: brand.page_id,
+    page_name: brand.page_name,
+    ad_count: brand.ad_count,
+    active_ad_count: brand.active_ad_count,
+    avg_days_running: brand.avg_days_running,
+    max_days_running: brand.max_days_running,
+    niches_hit: brand.niches_hit,
+    keywords_hit: brand.keywords_hit,
+    scaling_score,
+    scaling_breakdown,
+    product_analysis: analysis,
+    analysis_status: "success",
+    source_ad_ids: brand.ad_ids,
     lebanon_competition: "Unknown",
-    has_recurring_purchase: parsed.has_recurring_purchase,
-    cross_sell_opportunities: parsed.cross_sell_opportunities,
-    source_ads: ads,
     alibaba_suppliers: [],
     alibaba_search_url: "",
-    score_rationale: enrichedRationale,
+    manual_review_needed: buildManualReviewItems(analysis),
   };
-
-  log.info(`Scored "${parsed.product_name}"`, {
-    score: parsed.score,
-  });
-
-  return candidate as any;
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 async function main(): Promise<void> {
-  // Check API key before attempting to load the Claude module (which throws at import time if missing)
   if (!process.env.ANTHROPIC_API_KEY) {
     log.error(
-      "Skipping product scoring — API key not set. Set ANTHROPIC_API_KEY when you have credits.",
+      "Skipping product analysis — ANTHROPIC_API_KEY not set.",
     );
     process.exit(1);
   }
 
-  // Dynamically import askClaude after the key check to avoid the module-level throw
   const { askClaude } = await import("../utils/claude");
 
-  // Load ads.json
+  // Load inputs
+  if (!fs.existsSync(BRANDS_INPUT_PATH)) {
+    log.error(`data/brands.json not found. Run Phase 2 first.`);
+    process.exit(1);
+  }
   if (!fs.existsSync(ADS_INPUT_PATH)) {
-    log.error(`data/ads.json not found at ${ADS_INPUT_PATH}. Run Phase 1 first.`);
+    log.error(`data/ads.json not found. Run Phase 2 first.`);
     process.exit(1);
   }
 
-  let ads: Phase1Output;
+  let brands: BrandRecord[];
+  let adsFlat: MetaAd[];
   try {
-    const raw = fs.readFileSync(ADS_INPUT_PATH, "utf-8");
-    ads = JSON.parse(raw) as Phase1Output;
+    brands = JSON.parse(fs.readFileSync(BRANDS_INPUT_PATH, "utf-8")) as BrandRecord[];
+    adsFlat = JSON.parse(fs.readFileSync(ADS_INPUT_PATH, "utf-8")) as MetaAd[];
   } catch (err) {
-    log.error("Failed to parse data/ads.json", { error: (err as Error).message });
+    log.error("Failed to parse input files", { error: (err as Error).message });
     process.exit(1);
   }
 
-  if (!Array.isArray(ads) || ads.length === 0) {
-    log.error("data/ads.json is empty or not an array. Run Phase 1 first.");
+  if (!Array.isArray(brands) || brands.length === 0) {
+    log.error("data/brands.json is empty. Run Phase 2 first.");
+    process.exit(1);
+  }
+  if (!Array.isArray(adsFlat) || adsFlat.length === 0) {
+    log.error("data/ads.json is empty. Run Phase 2 first.");
     process.exit(1);
   }
 
-  log.info(`Phase 2 starting`, { totalAds: ads.length });
-
-  // Group ads by search_term_used
-  const groups = new Map<string, MetaAd[]>();
-  for (const ad of ads) {
-    const key = ad.search_term_used ?? "unknown";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(ad);
+  // Build ad lookup map
+  const adMap = new Map<string, MetaAd>();
+  for (const ad of adsFlat) {
+    adMap.set(ad.ad_id, ad);
   }
 
-  const keywords = Array.from(groups.keys());
-  log.info(`Grouped into ${keywords.length} keyword groups`, { keywords });
-
-  // Score each group via Claude
-  const allCandidates: Omit<ProductCandidate, 'verdict'>[] = [];
-
-  for (let i = 0; i < keywords.length; i++) {
-    const keyword = keywords[i];
-    const groupAds = groups.get(keyword)!;
-
-    const candidate = await scoreProductGroup(keyword, groupAds, askClaude);
-    if (candidate) {
-      allCandidates.push(candidate);
-    }
-
-    // Delay between Claude calls (skip delay after the last call)
-    if (i < keywords.length - 1) {
-      await sleep(BETWEEN_CALLS_DELAY_MS);
-    }
-  }
-
-  // Filter, sort, and cap results
-  const passing = allCandidates.filter((c) => c.score >= MIN_SCORE);
-  const sorted = passing.sort((a, b) => b.score - a.score);
-  const top = sorted.slice(0, MAX_CANDIDATES).map((c) => ({
-    ...c,
-    verdict: assignVerdict(c.score),
-  }));
-
-  log.info("Phase 2 summary", {
-    groupsProcessed: keywords.length,
-    totalScored: allCandidates.length,
-    passedThreshold: passing.length,
-    written: top.length,
+  log.info("Phase 3 starting", {
+    totalBrands: brands.length,
+    totalAds: adsFlat.length,
+    topNToAnalyze: TOP_N_BRANDS_TO_ANALYZE,
   });
 
-  if (top.length === 0) {
-    log.warn(
-      `No products scored >= ${MIN_SCORE}. Candidates file will be empty. Consider reviewing ad quality or scoring criteria.`,
+  // Score, sort, slice
+  const scored = brands.map((brand) => ({
+    brand,
+    ...computeScalingScore(brand),
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  const topBrands = scored.slice(0, TOP_N_BRANDS_TO_ANALYZE);
+
+  log.info(`Analyzing top ${topBrands.length} brands by scaling_score`, {
+    scoreRange: `${topBrands.at(-1)?.score ?? 0}–${topBrands[0]?.score ?? 0}`,
+  });
+
+  // Parallel batch analysis
+  const candidates: ProductCandidate[] = [];
+
+  for (let i = 0; i < topBrands.length; i += PARALLEL_BATCH_SIZE) {
+    const batch = topBrands.slice(i, i + PARALLEL_BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(({ brand, score, breakdown }, j) =>
+        analyzeBrand(
+          brand,
+          i + j,
+          topBrands.length,
+          adMap,
+          { scaling_score: score, scaling_breakdown: breakdown },
+          askClaude,
+        ),
+      ),
     );
+    candidates.push(...results);
   }
+
+  // Sort output by scaling_score descending
+  candidates.sort((a, b) => b.scaling_score - a.scaling_score);
+
+  // Summary stats
+  const successes = candidates.filter((c) => c.analysis_status === "success").length;
+  const failures = candidates.filter((c) => c.analysis_status === "failed").length;
+  const skipped = candidates.filter((c) => c.analysis_status === "skipped_no_text").length;
+  const scores = candidates.map((c) => c.scaling_score);
+  const median = scores.length
+    ? scores.slice().sort((a, b) => a - b)[Math.floor(scores.length / 2)]
+    : 0;
+
+  log.info("Phase 3 summary", {
+    totalBrandsInput: brands.length,
+    topNAnalyzed: topBrands.length,
+    successes,
+    failures,
+    skipped,
+    scalingScoreDistribution: {
+      min: Math.min(...scores),
+      median,
+      max: Math.max(...scores),
+    },
+  });
 
   // Write output
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  const output: Phase2Output = top;
+  const output: Phase2Output = candidates;
   fs.writeFileSync(CANDIDATES_OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
-  log.info(`Wrote ${top.length} candidates to ${CANDIDATES_OUTPUT_PATH}`);
-
-  // Print a brief table of results
-  if (top.length > 0) {
-    log.info("Top candidates:");
-    top.forEach((c, idx) => {
-      log.info(`  ${idx + 1}. ${c.product_name} — score ${c.score} (${c.verdict})`);
-    });
-  }
+  log.info(`Wrote ${candidates.length} candidates to ${CANDIDATES_OUTPUT_PATH}`);
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    log.error("Phase 2 crashed", {
+    log.error("Phase 3 crashed", {
       error: (err as Error).message,
       stack: (err as Error).stack,
     });
@@ -292,4 +452,4 @@ if (require.main === module) {
   });
 }
 
-export { buildUserPrompt, assignVerdict, scoreProductGroup };
+export { buildUserPrompt, computeScalingScore, validateProductAnalysis, analyzeBrand };

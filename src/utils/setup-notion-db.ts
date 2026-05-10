@@ -96,23 +96,32 @@ async function setupNichesDb(notion: Client, dbId: string): Promise<void> {
           ],
         },
       },
-      "Lebanon Fit": {
-        number: { format: "number" },
+      "Price Range": {
+        rich_text: {},
+      },
+      "Upsell / Repeat": {
+        rich_text: {},
+      },
+      "Lebanon Import Risk": {
+        select: {
+          options: [
+            { name: "Low",    color: "green" },
+            { name: "Medium", color: "yellow" },
+            { name: "High",   color: "red" },
+          ],
+        },
+      },
+      "Lebanon Import Notes": {
+        rich_text: {},
       },
       "Trend Status": {
         select: {
           options: [
-            { name: "Rising",   color: "green" },
-            { name: "Stable",   color: "blue" },
+            { name: "Rising",    color: "green" },
+            { name: "Stable",    color: "blue" },
             { name: "Declining", color: "red" },
           ],
         },
-      },
-      "Alibaba Price": {
-        rich_text: {},
-      },
-      "Selling Price": {
-        rich_text: {},
       },
       "Created At": {
         date: {},

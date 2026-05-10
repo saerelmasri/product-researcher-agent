@@ -106,12 +106,20 @@ Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 6 → Phase 
 Calls Claude API with a structured prompt describing private label constraints for the Lebanese market. Claude returns 12 candidate niches as JSON. Before saving, the phase fetches existing niche names from Notion and filters out duplicates. Only new niches are written to candidate-niches.json and to Notion.
 
 #### Claude prompt constraints (do not change without updating this section)
-- Target selling price: $15–$60
-- MOQ under 300 units (Alibaba)
-- Exclude: food, supplements, electronics requiring certification, cosmetics requiring certification
-- Must be shippable to Lebanon without special permits
-- Must be private label viable: generic product, no dominant brand, rebrandable
-- Lebanon market context: urban middle class buyer, price-sensitive, influenced by Gulf and European trends, high car ownership, growing remote work culture
+Goal: identify niches where US-based DTC brands are currently scaling on Meta ads, that can be sourced generically and sold into Lebanon.
+
+Hard constraints (all must pass):
+- Typical retail price $15–$60 USD
+- Generic category with strong private label history — no patent moats, no dominant single brand globally
+- No mandatory certifications for import (exclude: ingestibles, supplements, cosmetics with active ingredients, electronics requiring CE/FCC for primary function, kids' toys under 3yr, medical devices)
+- Physically robust for COD delivery — not fragile, not perishable (15–30% COD refusal rate)
+- AOV viable at $15+ retail (COD return costs eat margin on ultra-cheap items)
+
+Soft priorities (stronger niches hit more of these):
+- Visible scaling on US Meta ads in the past 12 months
+- Repeat purchase or natural upsell chain within the category
+- Visual/demo-friendly (works well in short-form video ads)
+- Solves a problem or triggers an emotion — not just "nice to have"
 
 #### Niche definition — IMPORTANT
 A niche is a broad market CATEGORY, not a specific product.
@@ -122,29 +130,31 @@ Specific products belong in the `examples` field. The `niche` field is the categ
 #### Niche JSON schema
 ```typescript
 interface CandidateNiche {
-  niche: string;                 // broad category, 1–3 words e.g. "Car Accessories"
-  examples: string[];            // 3 specific products within that category
-  privateLabelViable: string;    // one sentence explaining why
-  lebanonFit: number;            // 1–5 score
-  alibabaPrice: string;          // e.g. "$2–$6"
-  sellingPrice: string;          // e.g. "$18–$35"
-  reasoning: string;             // Lebanon-specific reasoning
+  niche: string;               // broad category, 1–3 words e.g. "Car Accessories"
+  rationale: string;           // 2-3 sentences on why it's winning on US Meta + private-label-friendly
+  examples: string[];          // 3-5 specific product types within the category
+  priceRange: string;          // e.g. "$20–$45"
+  upsellOrRepeat: string;      // repeat purchase or upsell mechanic
+  lebanonImportRisk: "low" | "medium" | "high";
+  lebanonImportNotes: string;  // one sentence on import/COD viability
 }
 ```
 
 #### Output file: candidate-niches.json
 ```json
-[
-  {
-    "niche": "Car Accessories",
-    "examples": ["seat back organizer", "dashboard phone mount", "trunk organizer with dividers"],
-    "privateLabelViable": "Generic products, no patents, easy to brand across the whole category",
-    "lebanonFit": 5,
-    "alibabaPrice": "$2–$8",
-    "sellingPrice": "$18–$40",
-    "reasoning": "High car ownership in Lebanon, no dominant local brand across any sub-category"
-  }
-]
+{
+  "niches": [
+    {
+      "niche": "Car Accessories",
+      "rationale": "Car accessory brands are scaling hard on Meta with demo-heavy creatives. Category has no dominant global brand and dozens of OEM suppliers on Alibaba.",
+      "examples": ["seat back organizer", "dashboard phone mount", "trunk organizer with dividers"],
+      "priceRange": "$18–$40",
+      "upsellOrRepeat": "Natural upsell chain across interior accessories — buyer of one often buys 2-3 more",
+      "lebanonImportRisk": "low",
+      "lebanonImportNotes": "No import restrictions, robust products handle COD returns well, high car ownership drives demand"
+    }
+  ]
+}
 ```
 
 ---
@@ -192,36 +202,33 @@ DECLINING niches are not written to this file. They are logged so the owner can 
 **Claude call:** Yes — one call per run (all niches in a single prompt).
 
 #### CRITICAL RULE
-Keywords are generated ONCE per niche and never regenerated. This is intentional. The weekly cron reads discovered-keywords.json as-is. Do not add keyword regeneration logic to the cron. Do not add a flag to force-regenerate unless the owner explicitly requests it and this file is updated to reflect that decision.
+Keywords are generated ONCE per niche and never regenerated. The weekly cron reads discovered-keywords.json as-is. Do not add regeneration logic to the cron.
 
 #### What it does
-For each niche that does not already have keywords in Notion, generates 6–8 keywords. Keywords must sound like ad headlines or buyer search queries — not generic product names. Mix of broad terms (for ad volume) and specific terms (for purchase intent). At least 2 problem-aware terms and 2 product-aware terms per niche.
+Generates exactly 8 keywords per niche with a required mix: 3 product category nouns, 2 hook/benefit phrases, 2 mechanism/feature phrases, 1 vernacular/community term. Keywords must be 1–3 words that appear in DTC ad copy or page names — NOT search-engine-style buyer queries.
 
 #### Output file: discovered-keywords.json
 ```json
 {
-  "Car Interior Organizers": [
-    "car seat organizer",
-    "trunk organizer for SUV",
-    "back seat storage kids",
-    "messy car storage solution",
-    "car organizer buy online",
-    "car interior accessories",
-    "road trip car organizer"
-  ],
-  "Home Office Desk Accessories": [
-    "desk organizer work from home",
-    "cable management desk",
-    "monitor stand with storage",
-    "home office setup accessories",
-    "desk mat large buy",
-    "minimalist desk organizer",
-    "work from home desk accessories"
+  "keywordsByNiche": [
+    {
+      "niche": "Car Accessories",
+      "keywords": [
+        {"term": "car organizer",    "type": "category"},
+        {"term": "trunk organizer",  "type": "category"},
+        {"term": "phone mount",      "type": "category"},
+        {"term": "clean car",        "type": "hook"},
+        {"term": "road trip ready",  "type": "hook"},
+        {"term": "magnetic mount",   "type": "mechanism"},
+        {"term": "no drill install", "type": "mechanism"},
+        {"term": "car setup",        "type": "vernacular"}
+      ]
+    }
   ]
 }
 ```
 
-Phase 2 reads this file. The schema of this file is the contract between Phase 1 and Phase 2. Do not change it without updating the Phase 2 reader.
+Phase 2 reads this file and flattens all `term` fields into its keyword list. The schema of this file is the contract between Phase 1 and Phase 2. Do not change it without updating the Phase 2 reader.
 
 ---
 

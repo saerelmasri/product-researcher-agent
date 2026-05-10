@@ -146,7 +146,7 @@ async function main(): Promise<void> {
 
   const groups = new Map<string, MetaAd[]>();
   for (const ad of ads) {
-    const key = ad.search_term_used ?? "unknown";
+    const key = ad.search_terms_used?.[0] ?? "unknown";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(ad);
   }

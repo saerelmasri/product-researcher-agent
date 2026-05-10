@@ -50,6 +50,7 @@ export async function fetchGoogleTrends(keyword: string): Promise<number[]> {
         engine: "google_trends",
         q: keyword,
         date: "today 12-m",
+        geo: "US",
         api_key: apiKey,
       },
     });
