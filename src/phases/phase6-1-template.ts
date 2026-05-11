@@ -54,8 +54,7 @@ function buildMarketAnalysis(c: ProductCandidate): string {
 
 // ── objections ─────────────────────────────────────────────────────────────────
 
-function shippingObjection(c: ProductCandidate): CustomerObjection {
-  const hasSupplier = c.alibaba_suppliers.length > 0;
+function shippingObjection(_c: ProductCandidate): CustomerObjection {
   return {
     category: "Shipping",
     customer_voice:
@@ -64,23 +63,15 @@ function shippingObjection(c: ProductCandidate): CustomerObjection {
     why_it_matters_in_lebanon:
       `Lebanon's national postal service has a poor reliability record; customers ` +
       `default to assuming the worst unless a trusted courier is named explicitly.`,
-    counter: hasSupplier
-      ? `State "Shipped via DHL/FedEx with tracking" prominently on the product page and ` +
-        `in the ad. Display the estimated delivery window (e.g. 3–5 business days) and ` +
-        `add a tracking-number follow-up message to every order confirmation.`
-      : `Source from a supplier (see ${c.alibaba_search_url}) that ships via DHL or FedEx. ` +
-        `Display the courier logo and tracking promise prominently — it removes the single ` +
-        `biggest hesitation before the add-to-cart click.`,
+    counter:
+      `State "Shipped via DHL/FedEx with tracking" prominently on the product page and ` +
+      `in the ad. Display the estimated delivery window (e.g. 3–5 business days) and ` +
+      `add a tracking-number follow-up message to every order confirmation.`,
   };
 }
 
-function qualityObjection(c: ProductCandidate): CustomerObjection {
-  const hasCerts =
-    c.alibaba_suppliers.length > 0 &&
-    c.alibaba_suppliers.some((s) => s.certifications.length > 0);
-  const certNote = hasCerts
-    ? `At least one shortlisted supplier holds relevant certifications — feature these on the product page.`
-    : `Request samples before ordering and shoot an honest unboxing video showing build quality.`;
+function qualityObjection(_c: ProductCandidate): CustomerObjection {
+  const certNote = `Request samples before ordering and shoot an honest unboxing video showing build quality.`;
 
   return {
     category: "Quality",
@@ -173,21 +164,11 @@ function buildVerdict(c: ProductCandidate): string {
 }
 
 function buildNextStep(c: ProductCandidate): string {
-  const supplierUrl =
-    c.alibaba_suppliers.length > 0
-      ? c.alibaba_suppliers[0].url || c.alibaba_search_url
-      : c.alibaba_search_url;
-
   if (c.verdict === "Investigate") {
-    const priceHint =
-      c.alibaba_suppliers.length > 0 && c.alibaba_suppliers[0].price_per_unit
-        ? ` at approximately ${c.alibaba_suppliers[0].price_per_unit} per unit`
-        : "";
     return (
-      `Contact the top Alibaba supplier for "${c.product_name}" (${supplierUrl}), ` +
-      `request a sample order of 3–5 units${priceHint}, and test the product personally ` +
-      `within the next 7 days. If quality passes, plan a 50-unit opening order with a ` +
-      `$${Math.round(c.selling_price_usd * 0.5)} Meta test ad budget over 2 weeks.`
+      `Search Alibaba manually for "${c.product_name}", request a sample order of 3–5 units, ` +
+      `and test the product personally within the next 7 days. If quality passes, plan a ` +
+      `50-unit opening order with a $${Math.round(c.selling_price_usd * 0.5)} Meta test ad budget over 2 weeks.`
     );
   }
 

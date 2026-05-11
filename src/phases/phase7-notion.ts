@@ -7,7 +7,7 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
-import { AlibabaSupplier, CustomerObjection, Phase6Output, ProductReport } from "../types";
+import { CustomerObjection, Phase6Output, ProductReport } from "../types";
 import { log } from "../utils/logger";
 
 dotenv.config();
@@ -21,7 +21,6 @@ const PROP = {
   score:          "Score",
   verdict:        "Verdict",
   sellingPrice:   "Selling price",
-  alibabaRange:   "Alibaba cost range",
   marginPct:      "Estimated margin %",
   weightKg:       "Weight kg",
   competition:    "Lebanon competition",
@@ -113,21 +112,6 @@ function objectionToggle(obj: CustomerObjection): Block {
   ]);
 }
 
-// ── supplier blocks ────────────────────────────────────────────────────────────
-
-function supplierBullet(s: AlibabaSupplier, index: number): Block {
-  const stars     = s.stars !== null ? `${s.stars}★` : "n/a";
-  const certs     = s.certifications.length > 0 ? s.certifications.join(", ") : "none";
-  const ta        = s.trade_assurance ? "Trade Assurance ✓" : "";
-  const verified  = s.verified ? "Verified ✓" : "";
-  const badges    = [ta, verified].filter(Boolean).join(" · ");
-  const line      =
-    `${index + 1}. ${s.name}  |  ${stars}  |  ${s.price_per_unit}  |  MOQ: ${s.moq}` +
-    (badges ? `  |  ${badges}` : "") +
-    (certs !== "none" ? `  |  Certs: ${certs}` : "");
-  return bullet(line);
-}
-
 // ── full block list for one report ────────────────────────────────────────────
 
 function buildBlocks(r: ProductReport): Block[] {
@@ -156,20 +140,7 @@ function buildBlocks(r: ProductReport): Block[] {
   r.customer_objections.forEach((obj) => blocks.push(objectionToggle(obj)));
   blocks.push(divider());
 
-  // 5. Alibaba suppliers
-  blocks.push(h2("🏭 Alibaba Suppliers"));
-  if (r.alibaba_suppliers.length > 0) {
-    r.alibaba_suppliers
-      .slice(0, 5)
-      .forEach((s, i) => blocks.push(supplierBullet(s, i)));
-  } else {
-    blocks.push(
-      bullet(`No supplier data scraped (Alibaba blocked). Manual lookup: ${r.alibaba_search_url}`),
-    );
-  }
-  blocks.push(divider());
-
-  // 6. Agent verdict — callout for visual prominence
+  // 5. Agent verdict — callout for visual prominence
   blocks.push(h2("🎯 Agent Verdict"));
   blocks.push(callout(r.agent_verdict));
   blocks.push(para(`📋 Recommended next step: ${r.recommended_next_step}`));
@@ -220,7 +191,6 @@ async function createPage(
     [PROP.score]:        { number: r.score },
     [PROP.verdict]:      { select: { name: r.verdict } },
     [PROP.sellingPrice]: { number: r.selling_price_usd },
-    [PROP.alibabaRange]: { rich_text: richText(r.alibaba_cost_range) },
     [PROP.marginPct]:    { number: r.estimated_margin_pct },
     [PROP.weightKg]:     { number: r.weight_kg },
     [PROP.niche]:        { rich_text: richText(r.niche) },

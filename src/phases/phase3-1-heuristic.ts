@@ -18,7 +18,6 @@ const SUSTAINED_AD_AGE_DAYS = 60;
 const STRONG_REQUIREMENT_PENALTY = 10;
 const NICE_TO_HAVE_BONUS = 5;
 const MAX_MOQ_FOR_FIRST_ORDER = 500;
-const MIN_MARKUP_MULTIPLIER = 3;
 
 function assignVerdict(score: number): "Investigate" | "Watch" | "Skip" {
   if (score >= 75) return "Investigate";
@@ -37,20 +36,10 @@ function checkMustHaves(est: KeywordEstimate): string[] {
   return failures;
 }
 
-function parseAlibabaCostMidpoint(range: string): number | null {
-  const match = range.match(/\$?(\d+(?:\.\d+)?)\s*-\s*\$?(\d+(?:\.\d+)?)/);
-  if (!match) return null;
-  const low = parseFloat(match[1]);
-  const high = parseFloat(match[2]);
-  if (Number.isNaN(low) || Number.isNaN(high)) return null;
-  return (low + high) / 2;
-}
-
 interface ScoreBreakdown {
   base: number;
   adBonus: number;
   ageBonus: number;
-  markupPenalty: number;
   moqPenalty: number;
   pricePremiumBonus: number;
   giftableBonus: number;
@@ -74,13 +63,6 @@ export function computeHeuristicScore(ads: MetaAd[], est: KeywordEstimate): Scor
   });
   const ageBonus = hasOldAd ? 10 : 0;
   if (ageBonus > 0) rationaleParts.push(`60d+ ad age (+${ageBonus})`);
-
-  const costMid = parseAlibabaCostMidpoint(est.alibaba_cost_range);
-  let markupPenalty = 0;
-  if (costMid !== null && est.selling_price_usd < costMid * MIN_MARKUP_MULTIPLIER) {
-    markupPenalty = STRONG_REQUIREMENT_PENALTY;
-    rationaleParts.push(`<3x markup (-${markupPenalty})`);
-  }
 
   let moqPenalty = 0;
   if (est.est_moq >= MAX_MOQ_FOR_FIRST_ORDER) {
@@ -112,7 +94,6 @@ export function computeHeuristicScore(ads: MetaAd[], est: KeywordEstimate): Scor
     base,
     adBonus,
     ageBonus,
-    markupPenalty,
     moqPenalty,
     pricePremiumBonus,
     giftableBonus,
@@ -181,15 +162,12 @@ async function main(): Promise<void> {
       niche: estimate.niche,
       score: breakdown.total,
       selling_price_usd: estimate.selling_price_usd,
-      alibaba_cost_range: estimate.alibaba_cost_range,
       estimated_margin_pct: estimate.estimated_margin_pct,
       weight_kg: estimate.weight_kg,
       lebanon_competition: "Unknown",
       has_recurring_purchase: estimate.has_recurring_purchase,
       cross_sell_opportunities: estimate.cross_sell_opportunities,
       source_ads: groupAds,
-      alibaba_suppliers: [],
-      alibaba_search_url: "",
       score_rationale: `Heuristic stub (must-haves passed): ${breakdown.rationaleParts.join(" + ")} = ${breakdown.total}`,
     };
 
@@ -242,4 +220,4 @@ if (require.main === module) {
   });
 }
 
-export { assignVerdict, checkMustHaves, parseAlibabaCostMidpoint };
+export { assignVerdict, checkMustHaves };

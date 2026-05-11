@@ -90,18 +90,6 @@ export interface RunState {
   lastRunAt: string | null;
 }
 
-export interface AlibabaSupplier {
-  name: string;
-  stars: number | null;
-  review_count: number;
-  certifications: string[];
-  trade_assurance: boolean;
-  verified: boolean;
-  price_per_unit: string;
-  moq: string;
-  url: string;
-}
-
 export interface CustomerObjection {
   category: "Shipping" | "Quality" | "Price" | "Trust";
   customer_voice: string;
@@ -111,28 +99,60 @@ export interface CustomerObjection {
 
 // ── Phase 3 output types ───────────────────────────────────────────────────────
 
-export interface ProductAnalysis {
+export interface ProductAnalysisIdentification {
   product_name: string;
   product_description: string;
   category: string;
-  stated_price: string | null;
-  problem_solved: string;
-  main_hook: string;
-  secondary_hooks: string[];
   appears_generic: boolean;
   appears_proprietary: boolean;
   generic_vs_proprietary_reasoning: string;
+}
+
+export interface ProductAnalysisWinningAssessment {
+  verdict: "strong_winner" | "likely_winner" | "testing" | "weak_signal";
+  verdict_reasoning: string;
+  scaling_signal_quality: "high" | "medium" | "low";
+  scaling_signal_reasoning: string;
+  durability_assessment: "evergreen" | "seasonal" | "trend" | "fad";
+  durability_reasoning: string;
+  confidence_signals: string[];
+  concern_signals: string[];
+}
+
+export interface PositioningAngle {
+  angle: string;
+  example_from_ad: string;
+}
+
+export interface ProductAnalysisIntelligence {
+  problems_solved: string[];
+  audience_segments: string[];
+  emotional_drivers: string[];
+  positioning_angles: PositioningAngle[];
+  main_hook: string;
+  secondary_hooks: string[];
+  creative_directions: string[];
   differentiation_angle: string;
   differentiation_copyable: boolean;
-  single_product_brand: boolean | "unclear";
-  brand_observations: string;
-  private_label_fit: "high" | "medium" | "low";
-  private_label_reasoning: string;
-  trend_or_evergreen: "trend" | "evergreen" | "unclear";
-  trend_evergreen_reasoning: string;
-  red_flags: string[];
-  creative_quality_signal: string;
-  notes_for_manual_review: string;
+  market_introduction_ideas: string[];
+}
+
+export interface ProductAnalysisEconomics {
+  stated_price_in_ads: string | null;
+  category_cost_range_usd: string;
+  category_shipping_range_usd: string;
+  confidence: "high" | "medium" | "low";
+  based_on: string;
+  margin_universe_check: string;
+  viable_for_private_label: boolean | "depends_on_sourcing";
+}
+
+export interface ProductAnalysis {
+  identification: ProductAnalysisIdentification;
+  winning_product_assessment: ProductAnalysisWinningAssessment;
+  product_intelligence: ProductAnalysisIntelligence;
+  economics_estimate: ProductAnalysisEconomics;
+  manual_review_needed: string[];
 }
 
 export interface ScalingBreakdown {
@@ -140,6 +160,34 @@ export interface ScalingBreakdown {
   max_days_running: number;
   ad_count: number;
   formula_version: string;
+}
+
+// ── Phase 4 output types ───────────────────────────────────────────────────────
+
+export type CompetitionLevel = "None" | "Light" | "Moderate" | "Heavy" | "Unknown";
+
+export interface BrandCompetitor {
+  page_id: string;
+  page_name: string;
+  ad_count: number;
+  active_ad_count: number;
+  max_days_running: number;
+  first_seen: string;    // ISO date string
+  last_seen: string;     // ISO date string
+  sample_ad_url: string;
+}
+
+export interface LebanonCompetition {
+  search_terms_used: string[];
+  total_competitors: number;
+  active_competitors: number;
+  serious_competitors: number;
+  competitors: BrandCompetitor[];
+  competition_level: CompetitionLevel;
+  manual_check_url: string;
+  signals_note: string;
+  thresholds_version: string;
+  computed_at: string;   // ISO timestamp
 }
 
 export interface ProductCandidate {
@@ -164,10 +212,8 @@ export interface ProductCandidate {
   // Source data for downstream phases (IDs only — full ads remain in ads.json)
   source_ad_ids: string[];
 
-  // Stubs filled by downstream phases
-  lebanon_competition: "Unknown" | "Low" | "Medium" | "High";
-  alibaba_suppliers: AlibabaSupplier[];
-  alibaba_search_url: string;
+  // Competition data — null until Phase 4 runs
+  lebanon_competition: LebanonCompetition | null;
 
   // Concrete items a human should verify before sourcing
   manual_review_needed: string[];

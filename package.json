@@ -11,7 +11,6 @@
     "phase3": "ts-node src/phases/phase3-filter.ts",
     "phase3-1": "ts-node src/phases/phase3-1-heuristic.ts",
     "phase4": "ts-node src/phases/phase4-competition.ts",
-    "phase5": "ts-node src/phases/phase5-suppliers.ts",
     "phase6": "ts-node src/phases/phase6-analysis.ts",
     "phase6-1": "ts-node src/phases/phase6-1-template.ts",
     "phase7": "ts-node src/phases/phase7-notion.ts",
@@ -25,7 +24,6 @@
     "@anthropic-ai/sdk": "^0.92.0",
     "@notionhq/client": "^2.2.15",
     "axios": "^1.7.7",
-    "cheerio": "^1.2.0",
     "dotenv": "^16.4.5",
     "node-cron": "^4.2.1"
   },

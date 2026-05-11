@@ -8,6 +8,8 @@
  *   npm run pipeline          — full run (Claude required for phases 3 and 6)
  *   npm run pipeline --offline — uses heuristic phases (no Claude needed)
  *
+ * Note: Phase 5 (Alibaba supplier lookup) has been removed. Supplier research is done manually.
+ *
  * Never chain this into Flow A (phases 0, 0.5, 1). Those are manual-only.
  */
 import * as dotenv from "dotenv";
@@ -78,9 +80,6 @@ async function main(): Promise<void> {
 
   // Phase 4 — Lebanon competition check (always runs)
   run("Phase 4 — Lebanon competition", phase("phase4-competition.ts"));
-
-  // Phase 5 — Alibaba supplier lookup (always runs)
-  run("Phase 5 — Alibaba suppliers", phase("phase5-suppliers.ts"));
 
   // Phase 6 — Deep analysis (Claude or template)
   if (offline) {

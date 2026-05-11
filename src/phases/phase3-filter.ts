@@ -26,7 +26,7 @@ const SCALING_SCORE_FORMULA_VERSION = "v1";
 // ── Prompts ────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT =
-  "You are a DTC product analyst. You evaluate brands running ads on Meta to identify private label opportunities. You analyze ONLY what is visible in the ad creative text provided — you do not estimate costs, margins, weights, or competitor data, because you cannot verify those from ads. You respond with valid JSON only — no markdown, no explanation, no code fences.";
+  "You are a DTC product research analyst with deep knowledge of e-commerce, private label, and DTC marketing. You analyze brands running ads on Meta to assess whether their products represent strong private label opportunities.\n\nYou analyze ONLY what is visible in the ad creative provided, plus your general knowledge of category-level economics. When estimating things you can't verify (costs, margins), you provide category-level ranges with explicit confidence levels — never fabricate precise numbers.\n\nYou distinguish between brands that are TESTING (running many short-lived ads, frequent variant changes, discount-heavy copy) and brands that are SCALING (consistent ad longevity, confident positioning, social proof). Real winners look like scaling, not testing.\n\nYou respond with valid JSON only — no markdown, no explanation, no code fences.";
 
 function buildUserPrompt(brand: BrandRecord, ads: MetaAd[]): string {
   const adBodies = ads
@@ -34,7 +34,7 @@ function buildUserPrompt(brand: BrandRecord, ads: MetaAd[]): string {
     .filter(Boolean)
     .join("\n---\n");
 
-  return `Analyze this brand running ads on US Meta (Facebook/Instagram).
+  return `Analyze this brand running ads on US Meta (Facebook/Instagram) as a potential private label opportunity.
 
 BRAND CONTEXT:
 - Page name: ${brand.page_name}
@@ -48,50 +48,66 @@ AD CREATIVES (each separated by ---):
 ${adBodies}
 
 YOUR TASK:
-Based ONLY on what you can read in the ad creatives above, analyze this brand's product as a potential private label opportunity. Do not guess at costs, weights, margins, MOQs, supplier data, or competitor metrics — those will be verified manually later.
+Based on what you can read in the ad creatives plus your general category knowledge, produce a research brief on this brand's product. Do not fabricate precise costs, weights, or competitor data. For category-level economics, give ranges with explicit confidence.
 
 Return JSON in this exact schema:
 
 {
-  "product_name": "string — the specific product the brand is selling, in 2-5 words",
-  "product_description": "string — one sentence describing what the product does",
-  "category": "string — broad category (e.g. 'car accessories', 'home office', 'pet')",
+  "identification": {
+    "product_name": "string — 2-5 words",
+    "product_description": "string — one sentence",
+    "category": "string — broad category",
+    "appears_generic": true | false,
+    "appears_proprietary": true | false,
+    "generic_vs_proprietary_reasoning": "one sentence"
+  },
 
-  "stated_price": "string or null — only fill if a price is explicitly mentioned in ad copy, otherwise null. Do NOT estimate.",
+  "winning_product_assessment": {
+    "verdict": "strong_winner | likely_winner | testing | weak_signal",
+    "verdict_reasoning": "2-3 sentences",
+    "scaling_signal_quality": "high | medium | low",
+    "scaling_signal_reasoning": "is this real PMF or heavy testing?",
+    "durability_assessment": "evergreen | seasonal | trend | fad",
+    "durability_reasoning": "one sentence",
+    "confidence_signals": ["signs the brand is winning"],
+    "concern_signals": ["red/yellow flags visible in copy"]
+  },
 
-  "problem_solved": "string — the specific problem the ads claim this product solves",
-  "main_hook": "string — the primary angle/hook the brand leads with across their ads",
-  "secondary_hooks": ["array of other angles used across ad variants, max 4"],
+  "product_intelligence": {
+    "problems_solved": ["primary problem", "secondary", "..."],
+    "audience_segments": ["who this is sold to"],
+    "emotional_drivers": ["emotions the ads trigger"],
+    "positioning_angles": [
+      {"angle": "string", "example_from_ad": "string"}
+    ],
+    "main_hook": "string",
+    "secondary_hooks": ["array, max 4"],
+    "creative_directions": ["formats that seem to work — UGC, demos, etc."],
+    "differentiation_angle": "string",
+    "differentiation_copyable": true | false,
+    "market_introduction_ideas": [
+      "1-2 sentence ideas for how a new private label brand could enter this market"
+    ]
+  },
 
-  "appears_generic": true | false,
-  "appears_proprietary": true | false,
-  "generic_vs_proprietary_reasoning": "string — one sentence explaining your call. Generic = could be sourced from many suppliers and rebranded. Proprietary = patented mechanism, unique design, or brand-specific IP.",
+  "economics_estimate": {
+    "stated_price_in_ads": "string or null — only if explicitly stated, do NOT estimate",
+    "category_cost_range_usd": "string — e.g. '$2-5'",
+    "category_shipping_range_usd": "string — e.g. '$1-3'",
+    "confidence": "high | medium | low",
+    "based_on": "string — e.g. 'category-level averages for [category]'",
+    "margin_universe_check": "string — if priced at $X with typical landed cost $Y, margin lands around Z%",
+    "viable_for_private_label": true | false | "depends_on_sourcing"
+  },
 
-  "differentiation_angle": "string — what specifically makes THIS brand's version stand out in the ads (could be: hook, branding, bundle, demographic, use case). If undifferentiated, say so.",
-  "differentiation_copyable": true | false,
-
-  "single_product_brand": true | false | "unclear",
-  "brand_observations": "string — what the ad copy and page name suggest about the brand (single-product store, catalog brand, lifestyle brand, etc.)",
-
-  "private_label_fit": "high | medium | low",
-  "private_label_reasoning": "string — 1-2 sentences. High = generic product, copyable angle, no IP moat. Low = proprietary mechanism, brand-dependent appeal, or strong patent/trademark signal.",
-
-  "trend_or_evergreen": "trend | evergreen | unclear",
-  "trend_evergreen_reasoning": "string — one sentence. Look for language like 'viral', 'trending', 'TikTok made me', seasonal hooks, or fad-style urgency vs. timeless problem-solving.",
-
-  "red_flags": ["array of concerns visible in the ad copy — e.g. 'mentions FDA approval', 'patent pending language', 'celebrity endorsement', 'medical claims', 'requires certification', 'fragile product hints'. Empty array if none."],
-
-  "creative_quality_signal": "string — brief observation on the ad copy itself: is it polished/professional, scrappy/UGC-style, or template-driven? This signals the brand's marketing maturity.",
-
-  "notes_for_manual_review": "string — 1-2 sentences flagging anything specific you'd want a human to verify before sourcing this product. Be concrete."
+  "manual_review_needed": ["specific things a human should verify before sourcing"]
 }
 
 CRITICAL RULES:
-- If a field cannot be determined from the ad creatives, use null, "unclear", or an empty array as appropriate. Do NOT guess.
-- Do not output any field not in the schema.
-- Do not include cost, weight, margin, MOQ, or competitor data anywhere.
-- Be skeptical: if ads make medical claims, mention FDA/CE/patents, or rely on celebrity faces, flag in red_flags.
-- "appears_generic" and "appears_proprietary" should usually NOT both be true. If genuinely ambiguous, set both false and explain in the reasoning field.`;
+- If a field cannot be determined, use null, "unclear", or empty array. Do NOT guess.
+- Do not output fields not in the schema.
+- For economics_estimate, give category-level ranges with confidence — never fabricate precise product-specific numbers.
+- "appears_generic" and "appears_proprietary" should usually NOT both be true. If genuinely ambiguous, set both false and explain.`;
 }
 
 // ── Scaling score ──────────────────────────────────────────────────────────────
@@ -118,48 +134,82 @@ function computeScalingScore(brand: BrandRecord): {
 
 // ── Response parsing & validation ─────────────────────────────────────────────
 
+function isStringArray(v: unknown): boolean {
+  return Array.isArray(v) && (v as unknown[]).every((x) => typeof x === "string");
+}
+
+function isNonEmptyString(v: unknown): boolean {
+  return typeof v === "string" && v.length > 0;
+}
+
 function validateProductAnalysis(obj: unknown): obj is ProductAnalysis {
   if (typeof obj !== "object" || obj === null) return false;
   const r = obj as Record<string, unknown>;
 
-  const requiredStrings: (keyof ProductAnalysis)[] = [
-    "product_name",
-    "product_description",
-    "category",
-    "problem_solved",
-    "main_hook",
-    "generic_vs_proprietary_reasoning",
-    "differentiation_angle",
-    "brand_observations",
-    "private_label_reasoning",
-    "trend_evergreen_reasoning",
-    "creative_quality_signal",
-    "notes_for_manual_review",
-  ];
-  for (const field of requiredStrings) {
-    if (typeof r[field] !== "string" || (r[field] as string).length === 0) return false;
-  }
+  // identification
+  const id = r.identification as Record<string, unknown> | undefined;
+  if (typeof id !== "object" || id === null) return false;
+  if (!isNonEmptyString(id.product_name)) return false;
+  if (!isNonEmptyString(id.product_description)) return false;
+  if (!isNonEmptyString(id.category)) return false;
+  if (typeof id.appears_generic !== "boolean") return false;
+  if (typeof id.appears_proprietary !== "boolean") return false;
+  if (!isNonEmptyString(id.generic_vs_proprietary_reasoning)) return false;
 
-  if (r.stated_price !== null && typeof r.stated_price !== "string") return false;
+  // winning_product_assessment
+  const wpa = r.winning_product_assessment as Record<string, unknown> | undefined;
+  if (typeof wpa !== "object" || wpa === null) return false;
+  if (!["strong_winner", "likely_winner", "testing", "weak_signal"].includes(wpa.verdict as string)) return false;
+  if (!isNonEmptyString(wpa.verdict_reasoning)) return false;
+  if (!["high", "medium", "low"].includes(wpa.scaling_signal_quality as string)) return false;
+  if (!isNonEmptyString(wpa.scaling_signal_reasoning)) return false;
+  if (!["evergreen", "seasonal", "trend", "fad"].includes(wpa.durability_assessment as string)) return false;
+  if (!isNonEmptyString(wpa.durability_reasoning)) return false;
+  if (!isStringArray(wpa.confidence_signals)) return false;
+  if (!isStringArray(wpa.concern_signals)) return false;
 
-  if (!Array.isArray(r.secondary_hooks) || !r.secondary_hooks.every((x) => typeof x === "string"))
-    return false;
-  if (!Array.isArray(r.red_flags) || !r.red_flags.every((x) => typeof x === "string"))
-    return false;
-
-  if (typeof r.appears_generic !== "boolean") return false;
-  if (typeof r.appears_proprietary !== "boolean") return false;
-  if (typeof r.differentiation_copyable !== "boolean") return false;
-
+  // product_intelligence
+  const pi = r.product_intelligence as Record<string, unknown> | undefined;
+  if (typeof pi !== "object" || pi === null) return false;
+  if (!isStringArray(pi.problems_solved)) return false;
+  if (!isStringArray(pi.audience_segments)) return false;
+  if (!isStringArray(pi.emotional_drivers)) return false;
   if (
-    r.single_product_brand !== true &&
-    r.single_product_brand !== false &&
-    r.single_product_brand !== "unclear"
+    !Array.isArray(pi.positioning_angles) ||
+    !(pi.positioning_angles as unknown[]).every(
+      (a) =>
+        typeof a === "object" &&
+        a !== null &&
+        isNonEmptyString((a as Record<string, unknown>).angle) &&
+        isNonEmptyString((a as Record<string, unknown>).example_from_ad),
+    )
+  )
+    return false;
+  if (!isNonEmptyString(pi.main_hook)) return false;
+  if (!isStringArray(pi.secondary_hooks)) return false;
+  if (!isStringArray(pi.creative_directions)) return false;
+  if (!isNonEmptyString(pi.differentiation_angle)) return false;
+  if (typeof pi.differentiation_copyable !== "boolean") return false;
+  if (!isStringArray(pi.market_introduction_ideas)) return false;
+
+  // economics_estimate
+  const eco = r.economics_estimate as Record<string, unknown> | undefined;
+  if (typeof eco !== "object" || eco === null) return false;
+  if (eco.stated_price_in_ads !== null && typeof eco.stated_price_in_ads !== "string") return false;
+  if (!isNonEmptyString(eco.category_cost_range_usd)) return false;
+  if (!isNonEmptyString(eco.category_shipping_range_usd)) return false;
+  if (!["high", "medium", "low"].includes(eco.confidence as string)) return false;
+  if (!isNonEmptyString(eco.based_on)) return false;
+  if (!isNonEmptyString(eco.margin_universe_check)) return false;
+  if (
+    eco.viable_for_private_label !== true &&
+    eco.viable_for_private_label !== false &&
+    eco.viable_for_private_label !== "depends_on_sourcing"
   )
     return false;
 
-  if (!["high", "medium", "low"].includes(r.private_label_fit as string)) return false;
-  if (!["trend", "evergreen", "unclear"].includes(r.trend_or_evergreen as string)) return false;
+  // manual_review_needed
+  if (!isStringArray(r.manual_review_needed)) return false;
 
   return true;
 }
@@ -189,20 +239,6 @@ function parseClaudeResponse(raw: string, pageName: string): ProductAnalysis | n
 
 // ── Per-brand analysis ─────────────────────────────────────────────────────────
 
-function buildManualReviewItems(analysis: ProductAnalysis): string[] {
-  const items: string[] = [];
-  if (analysis.notes_for_manual_review) {
-    items.push(analysis.notes_for_manual_review);
-  }
-  if (analysis.red_flags.length > 0) {
-    items.push(`Red flags: ${analysis.red_flags.join(", ")}`);
-  }
-  if (analysis.appears_proprietary) {
-    items.push("Appears proprietary — verify IP before sourcing");
-  }
-  return items;
-}
-
 async function analyzeBrand(
   brand: BrandRecord,
   index: number,
@@ -217,7 +253,7 @@ async function analyzeBrand(
 
   if (brandAds.length === 0) {
     log.info(
-      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=skipped_no_text fit=null`,
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=skipped_no_text verdict=null`,
     );
     return {
       page_id: brand.page_id,
@@ -233,9 +269,8 @@ async function analyzeBrand(
       product_analysis: null,
       analysis_status: "skipped_no_text",
       source_ad_ids: brand.ad_ids,
-      lebanon_competition: "Unknown",
-      alibaba_suppliers: [],
-      alibaba_search_url: "",
+      lebanon_competition: null,
+
       manual_review_needed: ["No ad text available — analysis skipped"],
     };
   }
@@ -250,7 +285,7 @@ async function analyzeBrand(
       error: (err as Error).message,
     });
     log.info(
-      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed fit=null`,
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed verdict=null`,
     );
     return {
       page_id: brand.page_id,
@@ -266,9 +301,8 @@ async function analyzeBrand(
       product_analysis: null,
       analysis_status: "failed",
       source_ad_ids: brand.ad_ids,
-      lebanon_competition: "Unknown",
-      alibaba_suppliers: [],
-      alibaba_search_url: "",
+      lebanon_competition: null,
+
       manual_review_needed: ["Claude API call failed — retry or review manually"],
     };
   }
@@ -277,7 +311,7 @@ async function analyzeBrand(
 
   if (!analysis) {
     log.info(
-      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed fit=null`,
+      `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=failed verdict=null`,
     );
     return {
       page_id: brand.page_id,
@@ -293,15 +327,15 @@ async function analyzeBrand(
       product_analysis: null,
       analysis_status: "failed",
       source_ad_ids: brand.ad_ids,
-      lebanon_competition: "Unknown",
-      alibaba_suppliers: [],
-      alibaba_search_url: "",
+      lebanon_competition: null,
+
       manual_review_needed: ["Claude response failed validation — retry or review manually"],
     };
   }
 
+  const fit = analysis.winning_product_assessment.verdict;
   log.info(
-    `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=success fit=${analysis.private_label_fit}`,
+    `[${index + 1}/${total}] page_name=${brand.page_name} scaling_score=${scaling_score} status=success verdict=${fit}`,
   );
 
   return {
@@ -318,10 +352,8 @@ async function analyzeBrand(
     product_analysis: analysis,
     analysis_status: "success",
     source_ad_ids: brand.ad_ids,
-    lebanon_competition: "Unknown",
-    alibaba_suppliers: [],
-    alibaba_search_url: "",
-    manual_review_needed: buildManualReviewItems(analysis),
+    lebanon_competition: null,
+    manual_review_needed: analysis.manual_review_needed,
   };
 }
 
@@ -418,9 +450,14 @@ async function main(): Promise<void> {
   const failures = candidates.filter((c) => c.analysis_status === "failed").length;
   const skipped = candidates.filter((c) => c.analysis_status === "skipped_no_text").length;
   const scores = candidates.map((c) => c.scaling_score);
-  const median = scores.length
-    ? scores.slice().sort((a, b) => a - b)[Math.floor(scores.length / 2)]
-    : 0;
+  const sortedScores = scores.slice().sort((a, b) => a - b);
+  const median = sortedScores.length ? sortedScores[Math.floor(sortedScores.length / 2)] : 0;
+
+  const verdictCounts = { strong_winner: 0, likely_winner: 0, testing: 0, weak_signal: 0 };
+  for (const c of candidates) {
+    const v = c.product_analysis?.winning_product_assessment.verdict;
+    if (v && v in verdictCounts) verdictCounts[v]++;
+  }
 
   log.info("Phase 3 summary", {
     totalBrandsInput: brands.length,
@@ -429,10 +466,11 @@ async function main(): Promise<void> {
     failures,
     skipped,
     scalingScoreDistribution: {
-      min: Math.min(...scores),
+      min: sortedScores[0] ?? 0,
       median,
-      max: Math.max(...scores),
+      max: sortedScores.at(-1) ?? 0,
     },
+    verdictDistribution: verdictCounts,
   });
 
   // Write output

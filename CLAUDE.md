@@ -1,7 +1,7 @@
 # CLAUDE.md — Lebanon Private Label Product Research Agent
 
 ## What this project is
-A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for trending products globally, scores them against private label criteria, checks local Lebanon competition, finds verified Alibaba suppliers, and writes full product reports (including customer objection analysis) to a Notion database.
+A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for trending products globally, scores them against private label criteria, checks local Lebanon competition, and writes full product reports (including customer objection analysis) to a Notion database. Supplier research is done manually after reviewing Notion output.
 
 **This is a personal tool — not a SaaS product. The owner uses it to find products to private label and sell in Lebanon.**
 
@@ -33,7 +33,6 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
     phase3-filter.ts           # Claude scoring + criteria filter (was phase2-filter.ts)
     phase3-1-heuristic.ts      # Heuristic stopgap scorer — runs offline without Claude (was phase2-1)
     phase4-competition.ts      # Lebanon competitor check (was phase3)
-    phase5-suppliers.ts        # Alibaba supplier lookup (was phase4)
     phase6-analysis.ts         # Claude deep analysis + objections (was phase5)
     phase6-1-template.ts       # Templated analysis stopgap — runs offline without Claude (was phase5-1)
     phase7-notion.ts           # Notion writer (was phase6)
@@ -86,8 +85,8 @@ Phase 0   → Phase 0.5   → Phase 1
 Runs every Monday at 8am. Reads discovered-keywords.json written by Flow A and runs the full research pipeline.
 
 ```
-Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 6 → Phase 6.1 → Phase 7
-(scrape)  (filter)  (heuristic)  (comp.)   (supply)  (analysis) (template)  (notion)
+Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 6 → Phase 6.1 → Phase 7
+(scrape)  (filter)  (heuristic)  (comp.)   (analysis) (template)  (notion)
 ```
 
 ---
@@ -274,18 +273,8 @@ Re-queries Meta Ad Library filtered to Lebanon geo. High local ad spend on a key
 
 ---
 
-### Phase 5 — Alibaba supplier lookup
-*(previously Phase 4)*
-
-**Input:** `data/candidates.json`
-**Output:** updates `data/candidates.json`
-
-HTTP scraping of Alibaba. If scraping breaks, fallback is SerpAPI (~$50/mo). Extracts: supplier name, star rating, certifications, price/unit, MOQ, link.
-
----
-
 ### Phase 6 — Claude deep analysis
-*(previously Phase 5)*
+*(previously Phase 5 — Phase 5/Alibaba supplier lookup has been removed; supplier research is done manually)*
 
 **Input:** `data/candidates.json`
 **Output:** `data/reports.json`
@@ -323,10 +312,9 @@ Build and test one phase at a time. Never move to the next phase until the curre
 **Flow B (build after Flow A produces valid discovered-keywords.json):**
 4. Phase 2 — Meta Ad Library scraper → outputs `data/ads.json`
 5. Phase 3 — Claude product filter → outputs `data/candidates.json`
-6. Phase 4 — Lebanon competition → updates `data/candidates.json`
-7. Phase 5 — Alibaba supplier lookup → updates `data/candidates.json`
-8. Phase 6 — Claude deep analysis → outputs `data/reports.json`
-9. Phase 7 — Notion writer + cron → final live output
+6. Phase 4 — Lebanon competition → outputs `data/candidates-with-competition.json`
+7. Phase 6 — Claude deep analysis → outputs `data/reports.json`
+8. Phase 7 — Notion writer + cron → final live output
 
 ## Current status
 > **Update this section as you complete each phase.**
@@ -337,7 +325,6 @@ Build and test one phase at a time. Never move to the next phase until the curre
 - [x] Phase 3 — Claude filter (was Phase 2)
 - [x] Phase 3.1 — Heuristic stopgap (was Phase 2.1)
 - [x] Phase 4 — Lebanon competition (was Phase 3)
-- [ ] Phase 5 — Alibaba suppliers (was Phase 4)
 - [ ] Phase 6 — Claude deep analysis (was Phase 5)
 - [ ] Phase 6.1 — Templated stopgap (was Phase 5.1)
 - [ ] Phase 7 — Notion writer + cron (was Phase 6)
@@ -414,8 +401,7 @@ Page content blocks (in order):
 2. Market analysis
 3. Cross-sell opportunities
 4. Customer objections (objection + why it matters in Lebanon + how to counter it on product page)
-5. Top Alibaba suppliers (name, stars, certifications, price/unit, MOQ, link)
-6. Agent verdict (plain language summary + recommended next step)
+5. Agent verdict (plain language summary + recommended next step)
 
 ---
 

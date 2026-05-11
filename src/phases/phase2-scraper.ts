@@ -209,6 +209,7 @@ async function fetchAdsForKeyword(
   keyword: string,
   token: string,
   countries: string[] = REACHED_COUNTRIES,
+  maxPages: number = MAX_PAGES,
 ): Promise<{ ads: MetaAdLibraryRawAd[]; pages_fetched: number }> {
   const baseParams: Record<string, unknown> = {
     access_token: token,
@@ -223,7 +224,7 @@ async function fetchAdsForKeyword(
   const all: MetaAdLibraryRawAd[] = [];
   let pages_fetched = 0;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  for (let page = 0; page < maxPages; page++) {
     const data = await fetchOnePage(baseParams, keyword, page + 1);
     if (!data) break;
 

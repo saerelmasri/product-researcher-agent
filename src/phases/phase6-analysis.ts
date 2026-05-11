@@ -25,21 +25,6 @@ You respond with valid JSON only — no markdown, no explanation, no code fences
 
 // ── prompt builder ─────────────────────────────────────────────────────────────
 
-function formatSuppliers(c: ProductCandidate): string {
-  if (c.alibaba_suppliers.length > 0) {
-    return c.alibaba_suppliers
-      .slice(0, 3)
-      .map(
-        (s, i) =>
-          `  Supplier ${i + 1}: ${s.name} | Stars: ${s.stars ?? "n/a"} | ` +
-          `Price: ${s.price_per_unit} | MOQ: ${s.moq} | ` +
-          `Certs: ${s.certifications.join(", ") || "none"}`,
-      )
-      .join("\n");
-  }
-  return `  No supplier data (Alibaba blocked scraper). Manual lookup: ${c.alibaba_search_url}`;
-}
-
 function formatAdSamples(c: ProductCandidate): string {
   const samples = c.source_ads
     .slice(0, 2)
@@ -60,16 +45,12 @@ PRODUCT: ${c.product_name}
 NICHE: ${c.niche}
 SCORE: ${c.score}/100 — Verdict: ${c.verdict}
 SELLING PRICE: $${c.selling_price_usd}
-ALIBABA COST RANGE: ${c.alibaba_cost_range}
 ESTIMATED MARGIN: ${c.estimated_margin_pct}%
 WEIGHT: ${c.weight_kg} kg
 LEBANON COMPETITION: ${c.lebanon_competition}
 REPEAT PURCHASE: ${c.has_recurring_purchase ? "Yes" : "No"}
 CROSS-SELL OPPORTUNITIES: ${c.cross_sell_opportunities.join(", ")}
 SCORE RATIONALE: ${c.score_rationale}
-
-ALIBABA SUPPLIERS:
-${formatSuppliers(c)}
 
 META ADS SAMPLE (how this product is marketed right now):
 ${formatAdSamples(c)}
