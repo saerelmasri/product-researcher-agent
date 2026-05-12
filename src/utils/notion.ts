@@ -149,7 +149,7 @@ export async function writeKeywordsToNotion(
       await notion.pages.create({
         parent: { database_id: dbId },
         properties: {
-          Keyword: { title: [{ text: { content: kw } }] },
+          Name: { title: [{ text: { content: kw } }] },
           Niche: { rich_text: [{ text: { content: niche } }] },
           "Created At": { date: { start: new Date().toISOString().split("T")[0] } },
         },
