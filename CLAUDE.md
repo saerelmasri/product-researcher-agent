@@ -34,7 +34,6 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
     phase3-1-heuristic.ts      # Heuristic stopgap scorer — runs offline without Claude
     phase4-competition.ts      # Lebanon competitor check
     phase5-analysis.ts         # Claude deep analysis + objections
-    phase5-1-template.ts       # Templated analysis stopgap — runs offline without Claude
     phase6-notion.ts           # Notion writer
   /types
     index.ts                   # Shared TypeScript types only (no data constants)
@@ -86,8 +85,8 @@ Phase 0   → Phase 0.5   → Phase 1
 Runs every Monday at 8am. Reads discovered-keywords.json written by Flow A and runs the full research pipeline.
 
 ```
-Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 5.1 → Phase 6
-(scrape)  (filter)  (heuristic)  (comp.)   (analysis) (template)  (notion)
+Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 6
+(scrape)  (filter)  (heuristic)  (comp.)   (analysis)  (notion)
 ```
 
 ---
@@ -280,12 +279,6 @@ Full synthesis of all upstream data into a structured report per product. Suppli
 
 ---
 
-### Phase 5.1 — Templated stopgap
-
-Offline analyser. No Claude required. Must output identical JSON schema as Phase 5. Phase 6 must not care which phase produced the report.
-
----
-
 ### Phase 6 — Notion writer
 
 **Input:** `data/reports.json`
@@ -320,7 +313,6 @@ Build and test one phase at a time. Never move to the next phase until the curre
 - [x] Phase 3.1 — Heuristic stopgap
 - [x] Phase 4 — Lebanon competition
 - [ ] Phase 5 — Claude deep analysis
-- [ ] Phase 5.1 — Templated stopgap
 - [ ] Phase 6 — Notion writer + cron
 
 ---
@@ -417,7 +409,7 @@ Common objection categories for Lebanon:
 - **The weekly cron starts at Phase 2, not Phase 0.** Flow A and Flow B are separate entry points. Never chain Phase 0 into the cron.
 - **discovered-keywords.json is the contract between Flow A and Flow B.** Do not change its schema without updating the Phase 2 reader simultaneously.
 - **Phase numbering has shifted.** The old Phase 1 is now Phase 2, old Phase 2 is now Phase 3, and so on. All file names use the new numbers. Do not revert to old numbering.
-- **Phase 5.1 (templated stopgap) must output the same JSON schema as Phase 5.** Phase 6 must not know or care which phase produced its input.
+- **Phase 5 is the only analysis phase.** There is no offline stopgap — Claude is required to produce reports.
 - **Ad platform is Meta Ad Library**, not TikTok — better Lebanon/MENA data, public API, no auth headaches.
 - **Alibaba**: HTTP scraping (no official API). If scraping breaks, fallback is SerpAPI (~$50/mo).
 - **No UI**: Pure backend. Agent runs on schedule, writes to Notion, owner reviews Notion.

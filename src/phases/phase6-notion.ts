@@ -225,7 +225,7 @@ async function main(): Promise<void> {
   }
 
   if (!fs.existsSync(INPUT_PATH)) {
-    log.error(`reports.json not found at ${INPUT_PATH}. Run Phase 5 or Phase 5.1 first.`);
+    log.error(`reports.json not found at ${INPUT_PATH}. Run Phase 5 first.`);
     process.exit(1);
   }
 
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
   }
 
   if (!Array.isArray(reports) || reports.length === 0) {
-    log.error("reports.json is empty. Run Phase 5 or Phase 5.1 first.");
+    log.error("reports.json is empty. Run Phase 5 first.");
     process.exit(1);
   }
 

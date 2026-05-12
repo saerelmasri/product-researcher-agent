@@ -1,14 +1,12 @@
 /**
  * Flow B — Weekly research pipeline orchestrator
  *
- * Runs phases 2 → 7 in sequence. Stops immediately if any phase fails.
+ * Runs phases 2 → 6 in sequence. Stops immediately if any phase fails.
  * Reads discovered-keywords.json (produced by Flow A) to drive the scraper.
  *
  * Usage:
  *   npm run pipeline          — full run (Claude required for phases 3 and 5)
- *   npm run pipeline --offline — uses heuristic phases (no Claude needed)
- *
- * Note: Phase 5 (Alibaba supplier lookup) has been removed. Supplier research is done manually.
+ *   npm run pipeline --offline — uses Phase 3.1 heuristic scorer; Phase 5 still requires Claude
  *
  * Never chain this into Flow A (phases 0, 0.5, 1). Those are manual-only.
  */
@@ -52,19 +50,16 @@ async function main(): Promise<void> {
   const offline = process.argv.includes("--offline");
   const hasClaudeKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
 
-  if (!hasClaudeKey && !offline) {
-    log.error(
-      "ANTHROPIC_API_KEY is not set. Run with `--offline` to use heuristic phases instead:",
-    );
-    log.error("  npx ts-node src/pipeline.ts --offline");
+  if (!hasClaudeKey) {
+    log.error("ANTHROPIC_API_KEY is not set. Claude is required for Phase 3 and Phase 5.");
     process.exit(1);
   }
 
-  if (offline) {
-    log.info("Pipeline starting in OFFLINE mode (heuristic phases — no Claude required)");
-  } else {
-    log.info("Pipeline starting (Claude enabled)");
-  }
+  log.info(
+    offline
+      ? "Pipeline starting — offline mode (Phase 3.1 heuristic scorer, Claude still used for Phase 5)"
+      : "Pipeline starting (Claude enabled)",
+  );
 
   const pipelineStart = Date.now();
 
@@ -81,12 +76,8 @@ async function main(): Promise<void> {
   // Phase 4 — Lebanon competition check (always runs)
   run("Phase 4 — Lebanon competition", phase("phase4-competition.ts"));
 
-  // Phase 5 — Deep analysis (Claude or template)
-  if (offline) {
-    run("Phase 5.1 — Templated analysis (offline)", phase("phase5-1-template.ts"));
-  } else {
-    run("Phase 5 — Claude deep analysis", phase("phase5-analysis.ts"));
-  }
+  // Phase 5 — Deep analysis (Claude required)
+  run("Phase 5 — Claude deep analysis", phase("phase5-analysis.ts"));
 
   // Phase 6 — Notion writer (always runs)
   run("Phase 6 — Notion writer", phase("phase6-notion.ts"));

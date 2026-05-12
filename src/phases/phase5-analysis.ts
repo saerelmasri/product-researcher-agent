@@ -254,7 +254,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
   log.info(`Phase 5 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
-  log.info("Run `npm run phase5-1` (offline) or `npm run phase6` (Notion) next.");
+  log.info("Run `npm run phase6` to write reports to Notion.");
 
   reports.forEach((r, i) => {
     const name = r.product_analysis?.identification.product_name ?? r.page_name;
