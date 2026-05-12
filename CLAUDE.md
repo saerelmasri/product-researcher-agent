@@ -29,13 +29,13 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
     phase0-niches.ts           # Claude niche generation — manual trigger only
     phase0-5-trends.ts         # SerpApi Google Trends validation — runs after Phase 0
     phase1-keywords.ts         # Claude keyword generation per niche — runs once per new niche
-    phase2-scraper.ts          # Meta Ad Library scraper (was phase1-scraper.ts)
-    phase3-filter.ts           # Claude scoring + criteria filter (was phase2-filter.ts)
-    phase3-1-heuristic.ts      # Heuristic stopgap scorer — runs offline without Claude (was phase2-1)
-    phase4-competition.ts      # Lebanon competitor check (was phase3)
-    phase6-analysis.ts         # Claude deep analysis + objections (was phase5)
-    phase6-1-template.ts       # Templated analysis stopgap — runs offline without Claude (was phase5-1)
-    phase7-notion.ts           # Notion writer (was phase6)
+    phase2-scraper.ts          # Meta Ad Library scraper
+    phase3-filter.ts           # Claude scoring + criteria filter
+    phase3-1-heuristic.ts      # Heuristic stopgap scorer — runs offline without Claude
+    phase4-competition.ts      # Lebanon competitor check
+    phase5-analysis.ts         # Claude deep analysis + objections
+    phase5-1-template.ts       # Templated analysis stopgap — runs offline without Claude
+    phase6-notion.ts           # Notion writer
   /types
     index.ts                   # Shared TypeScript types only (no data constants)
   /utils
@@ -50,8 +50,9 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
   validated-niches.json        # Output of Phase 0.5 — niches that passed trend filter
   discovered-keywords.json     # Output of Phase 1 — keywords grouped by niche
   ads.json                     # Output of Phase 2 — raw Meta ads
-  candidates.json              # Output of phases 3–5 — scored + enriched products
-  reports.json                 # Output of Phase 6 — full analysis ready for Notion
+  candidates.json              # Output of Phase 3 — scored products
+  candidates-with-competition.json  # Output of Phase 4 — enriched with Lebanon competition
+  reports.json                 # Output of Phase 5 — full analysis ready for Notion
 .env                           # API keys — never commit (gitignored)
 .env.example                   # Placeholder template — committed, no real keys
 CLAUDE.md                      # This file
@@ -85,7 +86,7 @@ Phase 0   → Phase 0.5   → Phase 1
 Runs every Monday at 8am. Reads discovered-keywords.json written by Flow A and runs the full research pipeline.
 
 ```
-Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 6 → Phase 6.1 → Phase 7
+Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 5.1 → Phase 6
 (scrape)  (filter)  (heuristic)  (comp.)   (analysis) (template)  (notion)
 ```
 
@@ -236,63 +237,56 @@ Phase 2 reads this file and flattens all `term` fields into its keyword list. Th
 Starts at Phase 2. Reads `data/discovered-keywords.json`. All phases below run on the Monday 8am cron.
 
 ### Phase 2 — Meta Ad Library scraper
-*(previously Phase 1)*
 
 **Input:** `data/discovered-keywords.json` (flat list of all keywords across all niches)
-**Output:** `data/ads.json`
+**Output:** `data/ads.json`, `data/brands.json`
 
-Scrapes Meta Ad Library for each keyword. Filters to active ads only. Returns ad copy, spend signals, creative format, advertiser info. See existing implementation.
+Scrapes Meta Ad Library for each keyword. Deduplicates ads, builds brand-level aggregates. Returns ad copy, spend signals, creative format, advertiser info.
 
 ---
 
 ### Phase 3 — Claude filter
-*(previously Phase 2)*
 
-**Input:** `data/ads.json`
+**Input:** `data/brands.json`, `data/ads.json`
 **Output:** `data/candidates.json`
-**Claude call:** Yes.
+**Claude call:** Yes (Sonnet 4.6).
 
-Scores each product against the three-tier criteria framework. See scoring criteria section below. Hard rejects are dropped. Outputs max 5 products per run (top 5 by score).
+Scores each brand against the DTC product analysis framework. Outputs all analyzed brands sorted by scaling_score.
 
 ---
 
 ### Phase 3.1 — Heuristic stopgap
-*(previously Phase 2.1)*
 
-Offline scorer. No Claude required. Mirrors Phase 3 criteria. Used for testing without burning API credits. See scoring criteria section.
+Offline scorer. No Claude required. Mirrors Phase 3 criteria. Used for testing without burning API credits.
 
 ---
 
 ### Phase 4 — Lebanon competition check
-*(previously Phase 3)*
 
 **Input:** `data/candidates.json`
-**Output:** updates `data/candidates.json`
+**Output:** `data/candidates-with-competition.json`
 
-Re-queries Meta Ad Library filtered to Lebanon geo. High local ad spend on a keyword = competition exists locally.
+Re-queries Meta Ad Library filtered to Lebanon geo. Builds per-competitor records and classifies competition level (None / Light / Moderate / Heavy).
 
 ---
 
-### Phase 6 — Claude deep analysis
-*(previously Phase 5 — Phase 5/Alibaba supplier lookup has been removed; supplier research is done manually)*
+### Phase 5 — Claude deep analysis
 
-**Input:** `data/candidates.json`
+**Input:** `data/candidates-with-competition.json`
 **Output:** `data/reports.json`
-**Claude call:** Yes.
+**Claude call:** Yes (Opus).
 
-Full synthesis of all upstream data into a structured report per product. See report schema in Notion section below.
-
----
-
-### Phase 6.1 — Templated stopgap
-*(previously Phase 5.1)*
-
-Offline analyser. No Claude required. Must output identical JSON schema as Phase 6. Phase 7 must not care which phase produced the report.
+Full synthesis of all upstream data into a structured report per product. Supplier research is done manually — Phase 5 focuses on market analysis, customer objections, agent verdict, and recommended next step. See report schema in Notion section below.
 
 ---
 
-### Phase 7 — Notion writer
-*(previously Phase 6)*
+### Phase 5.1 — Templated stopgap
+
+Offline analyser. No Claude required. Must output identical JSON schema as Phase 5. Phase 6 must not care which phase produced the report.
+
+---
+
+### Phase 6 — Notion writer
 
 **Input:** `data/reports.json`
 **Output:** Notion database pages
@@ -310,24 +304,24 @@ Build and test one phase at a time. Never move to the next phase until the curre
 3. Phase 1 — keyword generation → outputs `data/discovered-keywords.json`
 
 **Flow B (build after Flow A produces valid discovered-keywords.json):**
-4. Phase 2 — Meta Ad Library scraper → outputs `data/ads.json`
+4. Phase 2 — Meta Ad Library scraper → outputs `data/ads.json`, `data/brands.json`
 5. Phase 3 — Claude product filter → outputs `data/candidates.json`
 6. Phase 4 — Lebanon competition → outputs `data/candidates-with-competition.json`
-7. Phase 6 — Claude deep analysis → outputs `data/reports.json`
-8. Phase 7 — Notion writer + cron → final live output
+7. Phase 5 — Claude deep analysis → outputs `data/reports.json`
+8. Phase 6 — Notion writer + cron → final live output
 
 ## Current status
 > **Update this section as you complete each phase.**
 - [ ] Phase 0 — Niche generation (Claude)
 - [ ] Phase 0.5 — Trend validation (SerpApi)
 - [ ] Phase 1 — Keyword generation (Claude)
-- [x] Phase 2 — Meta scraper (was Phase 1)
-- [x] Phase 3 — Claude filter (was Phase 2)
-- [x] Phase 3.1 — Heuristic stopgap (was Phase 2.1)
-- [x] Phase 4 — Lebanon competition (was Phase 3)
-- [ ] Phase 6 — Claude deep analysis (was Phase 5)
-- [ ] Phase 6.1 — Templated stopgap (was Phase 5.1)
-- [ ] Phase 7 — Notion writer + cron (was Phase 6)
+- [x] Phase 2 — Meta scraper
+- [x] Phase 3 — Claude filter
+- [x] Phase 3.1 — Heuristic stopgap
+- [x] Phase 4 — Lebanon competition
+- [ ] Phase 5 — Claude deep analysis
+- [ ] Phase 5.1 — Templated stopgap
+- [ ] Phase 6 — Notion writer + cron
 
 ---
 
@@ -423,7 +417,7 @@ Common objection categories for Lebanon:
 - **The weekly cron starts at Phase 2, not Phase 0.** Flow A and Flow B are separate entry points. Never chain Phase 0 into the cron.
 - **discovered-keywords.json is the contract between Flow A and Flow B.** Do not change its schema without updating the Phase 2 reader simultaneously.
 - **Phase numbering has shifted.** The old Phase 1 is now Phase 2, old Phase 2 is now Phase 3, and so on. All file names use the new numbers. Do not revert to old numbering.
-- **Phase 6.1 (templated stopgap) must output the same JSON schema as Phase 6.** Phase 7 must not know or care which phase produced its input.
+- **Phase 5.1 (templated stopgap) must output the same JSON schema as Phase 5.** Phase 6 must not know or care which phase produced its input.
 - **Ad platform is Meta Ad Library**, not TikTok — better Lebanon/MENA data, public API, no auth headaches.
 - **Alibaba**: HTTP scraping (no official API). If scraping breaks, fallback is SerpAPI (~$50/mo).
 - **No UI**: Pure backend. Agent runs on schedule, writes to Notion, owner reviews Notion.

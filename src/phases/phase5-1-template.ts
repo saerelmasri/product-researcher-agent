@@ -1,10 +1,10 @@
 /**
- * Phase 6.1 — Templated analysis stopgap
+ * Phase 5.1 — Templated analysis stopgap
  *
- * Offline replacement for Phase 6. Produces the identical reports.json schema
- * using rule-based templates so Phase 7 can run without an Anthropic API key.
+ * Offline replacement for Phase 5. Produces the identical reports.json schema
+ * using rule-based templates so Phase 6 can run without an Anthropic API key.
  *
- * IMPORTANT: The output schema must stay in sync with phase6-analysis.ts.
+ * IMPORTANT: The output schema must stay in sync with phase5-analysis.ts.
  * If ProductReport changes, update both files.
  */
 import * as dotenv from "dotenv";
@@ -14,7 +14,7 @@ import * as path from "path";
 import {
   CustomerObjection,
   Phase3Output,
-  Phase6Output,
+  Phase5Output,
   ProductCandidate,
   ProductReport,
 } from "../types";
@@ -196,7 +196,7 @@ export function buildTemplatedReport(c: ProductCandidate): ProductReport {
 
 async function main(): Promise<void> {
   if (!fs.existsSync(INPUT_PATH)) {
-    log.error(`candidates.json not found at ${INPUT_PATH}. Run Phases 2–5 first.`);
+    log.error(`candidates.json not found at ${INPUT_PATH}. Run Phases 2–4 first.`);
     process.exit(1);
   }
 
@@ -209,7 +209,7 @@ async function main(): Promise<void> {
   }
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    log.error("candidates.json is empty. Run Phases 2–5 first.");
+    log.error("candidates.json is empty. Run Phases 2–4 first.");
     process.exit(1);
   }
 
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
   );
   const skipped = candidates.filter((c) => c.lebanon_competition === "High");
 
-  log.info("Phase 6.1 (templated) starting — no Claude required", {
+  log.info("Phase 5.1 (templated) starting — no Claude required", {
     totalCandidates: candidates.length,
     eligible: eligible.length,
     skippedHighCompetition: skipped.length,
@@ -245,11 +245,11 @@ async function main(): Promise<void> {
     return report;
   });
 
-  const output: Phase6Output = reports;
+  const output: Phase5Output = reports;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
-  log.info(`Phase 6.1 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
-  log.info("Run `npm run phase7` to write reports to Notion.");
+  log.info(`Phase 5.1 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
+  log.info("Run `npm run phase6` to write reports to Notion.");
 
   reports.forEach((r, i) => {
     log.info(`  ${i + 1}. ${r.product_name} [${r.verdict}]`);
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
 
 if (require.main === module) {
   main().catch((err) => {
-    log.error("Phase 6.1 crashed", {
+    log.error("Phase 5.1 crashed", {
       error: (err as Error).message,
       stack: (err as Error).stack,
     });

@@ -5,7 +5,7 @@
  * Reads discovered-keywords.json (produced by Flow A) to drive the scraper.
  *
  * Usage:
- *   npm run pipeline          — full run (Claude required for phases 3 and 6)
+ *   npm run pipeline          — full run (Claude required for phases 3 and 5)
  *   npm run pipeline --offline — uses heuristic phases (no Claude needed)
  *
  * Note: Phase 5 (Alibaba supplier lookup) has been removed. Supplier research is done manually.
@@ -81,15 +81,15 @@ async function main(): Promise<void> {
   // Phase 4 — Lebanon competition check (always runs)
   run("Phase 4 — Lebanon competition", phase("phase4-competition.ts"));
 
-  // Phase 6 — Deep analysis (Claude or template)
+  // Phase 5 — Deep analysis (Claude or template)
   if (offline) {
-    run("Phase 6.1 — Templated analysis (offline)", phase("phase6-1-template.ts"));
+    run("Phase 5.1 — Templated analysis (offline)", phase("phase5-1-template.ts"));
   } else {
-    run("Phase 6 — Claude deep analysis", phase("phase6-analysis.ts"));
+    run("Phase 5 — Claude deep analysis", phase("phase5-analysis.ts"));
   }
 
-  // Phase 7 — Notion writer (always runs)
-  run("Phase 7 — Notion writer", phase("phase7-notion.ts"));
+  // Phase 6 — Notion writer (always runs)
+  run("Phase 6 — Notion writer", phase("phase6-notion.ts"));
 
   const totalElapsed = ((Date.now() - pipelineStart) / 1000).toFixed(0);
   log.info(`Pipeline complete in ${totalElapsed}s — check Notion for new product pages.`);

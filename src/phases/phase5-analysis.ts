@@ -5,7 +5,7 @@ import * as path from "path";
 import {
   CustomerObjection,
   Phase3Output,
-  Phase6Output,
+  Phase5Output,
   ProductCandidate,
   ProductReport,
 } from "../types";
@@ -15,45 +15,39 @@ import { log } from "../utils/logger";
 dotenv.config();
 
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
-const INPUT_PATH = path.join(DATA_DIR, "candidates.json");
+const INPUT_PATH = path.join(DATA_DIR, "candidates-with-competition.json");
 const OUTPUT_PATH = path.join(DATA_DIR, "reports.json");
 const BETWEEN_CALLS_DELAY_MS = 2000;
 
 const SYSTEM_PROMPT = `You are a private label product analyst specialising in the Lebanese market.
-You write in plain, direct English for a Lebanese entrepreneur sourcing from Alibaba and selling locally.
+You write in plain, direct English for a Lebanese entrepreneur sourcing manually and selling locally.
 You respond with valid JSON only — no markdown, no explanation, no code fences.`;
 
 // ── prompt builder ─────────────────────────────────────────────────────────────
 
-function formatAdSamples(c: ProductCandidate): string {
-  const samples = c.source_ads
-    .slice(0, 2)
-    .map(
-      (ad, i) =>
-        `  Ad ${i + 1} (${ad.page_name}): ${ad.ad_creative_body
-          .slice(0, 220)
-          .replace(/\n+/g, " ")}`,
-    )
-    .join("\n");
-  return samples || "  No ad copy available.";
-}
-
 export function buildPrompt(c: ProductCandidate): string {
+  const productName = c.product_analysis?.identification.product_name ?? c.page_name;
+  const category = c.product_analysis?.identification.category ?? "unknown";
+  const verdict = c.product_analysis?.winning_product_assessment.verdict ?? "unknown";
+  const competitionLevel = c.lebanon_competition?.competition_level ?? "Unknown";
+  const totalCompetitors = c.lebanon_competition?.total_competitors ?? 0;
+  const seriousCompetitors = c.lebanon_competition?.serious_competitors ?? 0;
+  const mainHook = c.product_analysis?.product_intelligence.main_hook ?? "";
+  const problemsSolved = c.product_analysis?.product_intelligence.problems_solved.join(", ") ?? "";
+  const economics = c.product_analysis?.economics_estimate;
+
   return `Analyse this private label opportunity for the Lebanese market.
 
-PRODUCT: ${c.product_name}
-NICHE: ${c.niche}
-SCORE: ${c.score}/100 — Verdict: ${c.verdict}
-SELLING PRICE: $${c.selling_price_usd}
-ESTIMATED MARGIN: ${c.estimated_margin_pct}%
-WEIGHT: ${c.weight_kg} kg
-LEBANON COMPETITION: ${c.lebanon_competition}
-REPEAT PURCHASE: ${c.has_recurring_purchase ? "Yes" : "No"}
-CROSS-SELL OPPORTUNITIES: ${c.cross_sell_opportunities.join(", ")}
-SCORE RATIONALE: ${c.score_rationale}
-
-META ADS SAMPLE (how this product is marketed right now):
-${formatAdSamples(c)}
+BRAND: ${c.page_name}
+PRODUCT: ${productName}
+CATEGORY: ${category}
+SCALING SCORE: ${c.scaling_score}
+WINNING VERDICT: ${verdict}
+MAIN HOOK: ${mainHook}
+PROBLEMS SOLVED: ${problemsSolved}
+ECONOMICS: cost range ${economics?.category_cost_range_usd ?? "unknown"}, ${economics?.margin_universe_check ?? "unknown"}
+LEBANON COMPETITION: ${competitionLevel} (${totalCompetitors} total competitors, ${seriousCompetitors} serious)
+MANUAL CHECK URL: ${c.lebanon_competition?.manual_check_url ?? ""}
 
 ---
 
@@ -85,7 +79,7 @@ Generate a JSON report with exactly these four fields:
 
 "recommended_next_step"
   One specific, actionable instruction for what to do in the next 7 days.
-  Be concrete — name a supplier contact action, a test budget, or a specific market validation step.
+  Be concrete — name a supplier search action, a test budget, or a specific market validation step.
 
 Respond with ONLY this JSON:
 {
@@ -157,19 +151,20 @@ export async function analyseProduct(
   candidate: ProductCandidate,
   askClaude: AskClaudeFn,
 ): Promise<ProductReport | null> {
-  log.info(`Analysing "${candidate.product_name}"...`);
+  const productName = candidate.product_analysis?.identification.product_name ?? candidate.page_name;
+  log.info(`Analysing "${productName}"...`);
 
   let raw: string;
   try {
     raw = await askClaude(buildPrompt(candidate), SYSTEM_PROMPT, MODEL_DEEP);
   } catch (err) {
-    log.warn(`Claude call failed for "${candidate.product_name}"`, {
+    log.warn(`Claude call failed for "${productName}"`, {
       error: (err as Error).message,
     });
     return null;
   }
 
-  const analysis = parseResponse(raw, candidate.product_name);
+  const analysis = parseResponse(raw, productName);
   if (!analysis) return null;
 
   const report: ProductReport = {
@@ -181,7 +176,7 @@ export async function analyseProduct(
     week_generated: new Date().toISOString().split("T")[0],
   };
 
-  log.info(`  "${candidate.product_name}" — analysis done`);
+  log.info(`  "${productName}" — analysis done`);
   return report;
 }
 
@@ -189,14 +184,14 @@ export async function analyseProduct(
 
 async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    log.error("ANTHROPIC_API_KEY is not set. Phase 6 requires Claude.");
+    log.error("ANTHROPIC_API_KEY is not set. Phase 5 requires Claude.");
     process.exit(1);
   }
 
   const { askClaude } = await import("../utils/claude");
 
   if (!fs.existsSync(INPUT_PATH)) {
-    log.error(`candidates.json not found at ${INPUT_PATH}. Run Phases 2–5 first.`);
+    log.error(`candidates-with-competition.json not found. Run Phases 2–4 first.`);
     process.exit(1);
   }
 
@@ -204,41 +199,39 @@ async function main(): Promise<void> {
   try {
     candidates = JSON.parse(fs.readFileSync(INPUT_PATH, "utf-8")) as Phase3Output;
   } catch (err) {
-    log.error("Failed to parse candidates.json", { error: (err as Error).message });
+    log.error("Failed to parse candidates-with-competition.json", { error: (err as Error).message });
     process.exit(1);
   }
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    log.error("candidates.json is empty. Run Phases 2–5 first.");
+    log.error("candidates-with-competition.json is empty. Run Phases 2–4 first.");
     process.exit(1);
   }
 
-  // Per PRD: only run deep analysis on Low or Medium competition products
-  // Unknown is also included (Phase 4 may not have run or found nothing)
+  // Skip candidates where Lebanon competition is Heavy
   const eligible = candidates.filter(
-    (c) =>
-      c.lebanon_competition === "Low" ||
-      c.lebanon_competition === "Medium" ||
-      c.lebanon_competition === "Unknown",
+    (c) => c.lebanon_competition?.competition_level !== "Heavy",
   );
-  const skipped = candidates.filter((c) => c.lebanon_competition === "High");
+  const skipped = candidates.filter(
+    (c) => c.lebanon_competition?.competition_level === "Heavy",
+  );
 
-  log.info("Phase 6 starting — Claude deep analysis", {
+  log.info("Phase 5 starting — Claude deep analysis", {
     totalCandidates: candidates.length,
     eligible: eligible.length,
-    skippedHighCompetition: skipped.length,
+    skippedHeavyCompetition: skipped.length,
     model: MODEL_DEEP,
   });
 
   if (skipped.length > 0) {
     log.info(
-      "Skipping (High Lebanon competition):",
-      skipped.map((c) => c.product_name),
+      "Skipping (Heavy Lebanon competition):",
+      skipped.map((c) => c.product_analysis?.identification.product_name ?? c.page_name),
     );
   }
 
   if (eligible.length === 0) {
-    log.warn("All candidates have High Lebanon competition — nothing to analyse.");
+    log.warn("All candidates have Heavy Lebanon competition — nothing to analyse.");
     process.exit(0);
   }
 
@@ -257,21 +250,22 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const output: Phase6Output = reports;
+  const output: Phase5Output = reports;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
-  log.info(`Phase 6 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
-  log.info("Run `npm run phase6-1` (offline) or `npm run phase7` (Notion) next.");
+  log.info(`Phase 5 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
+  log.info("Run `npm run phase5-1` (offline) or `npm run phase6` (Notion) next.");
 
   reports.forEach((r, i) => {
-    log.info(`  ${i + 1}. ${r.product_name} [${r.verdict}]`);
+    const name = r.product_analysis?.identification.product_name ?? r.page_name;
+    log.info(`  ${i + 1}. ${name}`);
     log.info(`     Next step: ${r.recommended_next_step}`);
   });
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    log.error("Phase 6 crashed", {
+    log.error("Phase 5 crashed", {
       error: (err as Error).message,
       stack: (err as Error).stack,
     });

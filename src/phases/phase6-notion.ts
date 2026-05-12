@@ -7,7 +7,7 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
-import { CustomerObjection, Phase6Output, ProductReport } from "../types";
+import { CustomerObjection, Phase5Output, ProductReport } from "../types";
 import { log } from "../utils/logger";
 
 dotenv.config();
@@ -225,25 +225,25 @@ async function main(): Promise<void> {
   }
 
   if (!fs.existsSync(INPUT_PATH)) {
-    log.error(`reports.json not found at ${INPUT_PATH}. Run Phase 6 or Phase 6.1 first.`);
+    log.error(`reports.json not found at ${INPUT_PATH}. Run Phase 5 or Phase 5.1 first.`);
     process.exit(1);
   }
 
-  let reports: Phase6Output;
+  let reports: Phase5Output;
   try {
-    reports = JSON.parse(fs.readFileSync(INPUT_PATH, "utf-8")) as Phase6Output;
+    reports = JSON.parse(fs.readFileSync(INPUT_PATH, "utf-8")) as Phase5Output;
   } catch (err) {
     log.error("Failed to parse reports.json", { error: (err as Error).message });
     process.exit(1);
   }
 
   if (!Array.isArray(reports) || reports.length === 0) {
-    log.error("reports.json is empty. Run Phase 6 or Phase 6.1 first.");
+    log.error("reports.json is empty. Run Phase 5 or Phase 5.1 first.");
     process.exit(1);
   }
 
   const notion = new Client({ auth: apiKey });
-  log.info(`Phase 7 starting — writing ${reports.length} report(s) to Notion`);
+  log.info(`Phase 6 starting — writing ${reports.length} report(s) to Notion`);
 
   let created = 0;
   let skipped = 0;
@@ -267,12 +267,12 @@ async function main(): Promise<void> {
     }
   }
 
-  log.info(`Phase 7 complete`, { created, skipped, total: reports.length });
+  log.info(`Phase 6 complete`, { created, skipped, total: reports.length });
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    log.error("Phase 7 crashed", {
+    log.error("Phase 6 crashed", {
       error: (err as Error).message,
       stack: (err as Error).stack,
     });

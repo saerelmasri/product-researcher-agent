@@ -228,6 +228,5 @@ export interface ProductReport extends ProductCandidate {
 }
 
 export type Phase2Output = ProductCandidate[]; // output of Phase 3 filter
-export type Phase5Output = ProductReport[];    // output of Phase 6 analysis
 export type Phase3Output = ProductCandidate[];
-export type Phase6Output = ProductReport[];
+export type Phase5Output = ProductReport[];    // output of Phase 5 analysis
