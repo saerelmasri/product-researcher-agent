@@ -135,6 +135,7 @@ export interface ProductAnalysisIntelligence {
   differentiation_angle: string;
   differentiation_copyable: boolean;
   market_introduction_ideas: string[];
+  private_label_fit?: "high" | "medium" | "low"; // optional — add to Phase 3 schema to populate
 }
 
 export interface ProductAnalysisEconomics {
@@ -219,13 +220,20 @@ export interface ProductCandidate {
   manual_review_needed: string[];
 }
 
-export interface ProductReport extends ProductCandidate {
+export interface RecommendedNextStep {
+  action: string;           // specific action verb + specific target
+  why: string;              // one sentence on why this action first
+  success_criteria: string; // how you'll know it worked
+  kill_criteria: string;    // what would tell you to stop
+}
+
+export type ProductReport = ProductCandidate & {
   market_analysis: string;
   customer_objections: CustomerObjection[];
   agent_verdict: string;
-  recommended_next_step: string;
+  recommended_next_step: RecommendedNextStep;
   week_generated: string;
-}
+};
 
 export type Phase2Output = ProductCandidate[]; // output of Phase 3 filter
 export type Phase3Output = ProductCandidate[];

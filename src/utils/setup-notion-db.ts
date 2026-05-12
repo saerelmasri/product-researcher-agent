@@ -194,7 +194,7 @@ async function main(): Promise<void> {
     log.info("To finish Flow A setup, add the missing database IDs to .env and re-run `npm run setup`.");
   } else {
     log.info("All databases ready. Flow A: `npm run phase0` → `npm run phase0-5` → `npm run phase1`");
-    log.info("Flow B: `npm run pipeline` (or `npm run scheduler` to run every Monday at 8am)");
+    log.info("Flow B: `npm run pipeline` — run manually whenever you want fresh product research");
   }
 }
 

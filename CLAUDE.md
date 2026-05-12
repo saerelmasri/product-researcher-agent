@@ -1,7 +1,7 @@
 # CLAUDE.md — Lebanon Private Label Product Research Agent
 
 ## What this project is
-A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for trending products globally, scores them against private label criteria, checks local Lebanon competition, and writes full product reports (including customer objection analysis) to a Notion database. Supplier research is done manually after reviewing Notion output.
+A fully automated backend AI agent that scrapes Meta Ad Library for trending products globally, scores them against private label criteria, checks local Lebanon competition, and writes full product reports (including customer objection analysis) to a Notion database. The pipeline is run manually on demand. Supplier research is done manually after reviewing Notion output.
 
 **This is a personal tool — not a SaaS product. The owner uses it to find products to private label and sell in Lebanon.**
 
@@ -9,14 +9,13 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
 - Based in Lebanon, selling to Lebanese market only
 - Target: private labeling (not dropshipping)
 - Budget: $5–20/week running cost
-- Schedule: runs once per week (Monday 8am), can increase to twice/week later
+- Pipeline: run manually on demand (no cron)
 - Output: Notion database with one page per qualifying product
 
 ## Tech stack
 - **Language**: Node.js with TypeScript
 - **AI**: Anthropic Claude API (claude-opus-4-20250514) via direct API calls
-- **Scheduler**: node-cron for weekly runs
-- **Hosting**: Runs locally via node-cron. No cloud hosting needed.
+- **Hosting**: Runs locally on demand. No cron, no cloud hosting needed.
 - **Output**: Notion API
 
 ## Project structure
@@ -42,8 +41,7 @@ A fully automated backend AI agent that runs weekly, scrapes Meta Ad Library for
     serpapi.ts                 # SerpApi helper for Google Trends calls
     notion.ts                  # Notion API helper (read + write)
     logger.ts                  # Simple logger
-  pipeline.ts                  # Main orchestrator — runs phases 2–7 on weekly cron
-  scheduler.ts                 # Cron job wrapper
+  pipeline.ts                  # Main orchestrator — runs phases 2–6 manually on demand
 /data
   candidate-niches.json        # Output of Phase 0 — raw Claude niche list
   validated-niches.json        # Output of Phase 0.5 — niches that passed trend filter
@@ -81,8 +79,8 @@ Phase 0   → Phase 0.5   → Phase 1
 (niches)    (validation)   (keywords)
 ```
 
-### Flow B — Weekly product research (automated cron)
-Runs every Monday at 8am. Reads discovered-keywords.json written by Flow A and runs the full research pipeline.
+### Flow B — Product research pipeline (run manually on demand)
+Run with `npm run pipeline` whenever you want fresh product research. Reads discovered-keywords.json written by Flow A and runs the full research pipeline.
 
 ```
 Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 6
@@ -95,7 +93,7 @@ Phase 2 → Phase 3 → Phase 3.1 → Phase 4 → Phase 5 → Phase 6
 
 ### Phase 0 — Niche generation
 
-**Trigger:** Manual only. Run with `npm run phase0`. Never add this to the cron.
+**Trigger:** Manual only. Run with `npm run phase0`.
 **Input:** Owner constraints (hardcoded in prompt — see below)
 **Output:** `data/candidate-niches.json`
 **Notion interaction:** Reads existing niches from Notion Niches table before writing. Skips any niche already present (deduplication). Only writes genuinely new niches.
@@ -201,7 +199,7 @@ DECLINING niches are not written to this file. They are logged so the owner can 
 **Claude call:** Yes — one call per run (all niches in a single prompt).
 
 #### CRITICAL RULE
-Keywords are generated ONCE per niche and never regenerated. The weekly cron reads discovered-keywords.json as-is. Do not add regeneration logic to the cron.
+Keywords are generated ONCE per niche and never regenerated. The pipeline reads discovered-keywords.json as-is. Do not add regeneration logic to the pipeline.
 
 #### What it does
 Generates exactly 8 keywords per niche with a required mix: 3 product category nouns, 2 hook/benefit phrases, 2 mechanism/feature phrases, 1 vernacular/community term. Keywords must be 1–3 words that appear in DTC ad copy or page names — NOT search-engine-style buyer queries.
@@ -233,7 +231,7 @@ Phase 2 reads this file and flattens all `term` fields into its keyword list. Th
 
 ## Flow B — Weekly research pipeline
 
-Starts at Phase 2. Reads `data/discovered-keywords.json`. All phases below run on the Monday 8am cron.
+Starts at Phase 2. Reads `data/discovered-keywords.json`. Run `npm run pipeline` to execute all phases in sequence.
 
 ### Phase 2 — Meta Ad Library scraper
 
@@ -301,7 +299,7 @@ Build and test one phase at a time. Never move to the next phase until the curre
 5. Phase 3 — Claude product filter → outputs `data/candidates.json`
 6. Phase 4 — Lebanon competition → outputs `data/candidates-with-competition.json`
 7. Phase 5 — Claude deep analysis → outputs `data/reports.json`
-8. Phase 6 — Notion writer + cron → final live output
+8. Phase 6 — Notion writer → final live output
 
 ## Current status
 > **Update this section as you complete each phase.**
@@ -313,7 +311,7 @@ Build and test one phase at a time. Never move to the next phase until the curre
 - [x] Phase 3.1 — Heuristic stopgap
 - [x] Phase 4 — Lebanon competition
 - [ ] Phase 5 — Claude deep analysis
-- [ ] Phase 6 — Notion writer + cron
+- [ ] Phase 6 — Notion writer
 
 ---
 
@@ -357,73 +355,78 @@ Phase 3.1 (heuristic) evaluates 6/6 must-haves, 2/6 strong items (3× markup, MO
 ### Niches table (used by Flow A)
 - Name (title)
 - Status (select: Active / Paused / Rejected)
-- Lebanon Fit (number, 1–5)
 - Trend Status (select: Rising / Stable / Declining)
-- Alibaba Price (text)
-- Selling Price (text)
+- Price Range (text)
+- Upsell / Repeat (text)
+- Lebanon Import Risk (select: Low / Medium / High)
+- Lebanon Import Notes (text)
 - Created At (date)
 
 ### Keywords table (used by Flow A)
 - Keyword (title)
-- Niche (relation → Niches table)
+- Niche (text)
 - Created At (date)
 
 ### Products table (used by Flow B)
 Each product page must have these properties:
-- Title (product name)
-- Score (number, 0–100)
-- Verdict (select: Investigate / Watch / Skip)
-- Selling price (number)
-- Alibaba cost range (text)
-- Estimated margin % (number)
-- Weight kg (number)
-- Lebanon competition (select: Low / Medium / High)
-- Niche (text)
+- Name (title) — product name from Phase 3 analysis
+- Scaling Score (number) — computed signal: active_ads×2 + max_days_running×0.5 + ad_count×1
+- Verdict (select: strong_winner / likely_winner / testing / weak_signal)
+- Private Label Fit (select: high / medium / low) — optional, populated when Phase 3 schema includes this field
+- Durability (select: evergreen / seasonal / trend / fad)
+- Category (select) — broad product category
+- Niches Hit (text) — comma-separated niche names the brand was surfaced under
+- Lebanon Competition (select: None / Light / Moderate / Heavy / Unknown)
+- Total Competitors (number)
+- Serious Competitors (number) — advertisers running 30+ day campaigns in Lebanon
+- Manual Check URL (url) — direct Meta Ad Library Lebanon link for manual eyeball check
 - Status (select: New / Reviewing / Ordered / Rejected)
-- Week generated (date)
+- Week Generated (date)
 
 Page content blocks (in order):
-1. Criteria checklist
-2. Market analysis
-3. Cross-sell opportunities
-4. Customer objections (objection + why it matters in Lebanon + how to counter it on product page)
-5. Agent verdict (plain language summary + recommended next step)
+1. Product Assessment — verdict, scaling signal quality, durability, confidence signals, concern signals, verdict reasoning
+2. Product Intelligence — problems solved, audience segments, emotional drivers, main hook, positioning angles, market introduction ideas
+3. Economics Estimate — category cost range, shipping range, confidence level, margin universe check, private label viability + caveat callout
+4. Market Analysis — Claude's 2–3 sentence synthesis of the opportunity
+5. Customer Objections — 4 toggle blocks (Shipping, Quality, Price, Trust), each with customer voice, Lebanon-specific reason, concrete counter
+6. Agent Verdict + Recommended Next Step — verdict callout + 4-field next step (Action, Why, Success criteria, Kill signal)
+7. Lebanon Competition Detail — competition level, full competitor list (ad count, days running, last seen), manual check URL link
 
 ---
 
 ## Customer objections section — context
-This was added based on the insight that finding a product is easy — understanding why Lebanese customers hesitate is harder. For each product, Claude must generate 3–4 objections a Lebanese buyer would have, written as the customer would actually say it, plus a concrete counter for each one that can be used directly on the product page.
+Phase 5 generates exactly 4 product-specific objections per report — one per category — written as the Lebanese customer's raw internal voice. Each objection must be anchored in the specific product's context (not generic). Each includes a concrete counter usable directly on the product page or in ad copy.
 
-Common objection categories for Lebanon:
-- Shipping time / reliability
-- Product quality doubt ("cheap Chinese plastic")
-- Price sensitivity (Lebanon economic situation)
-- Brand trust (unknown store)
+Categories (fixed, in this order):
+- **Shipping** — reliability of delivery in Lebanon; DHL/FedEx as the trust signal
+- **Quality** — cultural distrust of "cheap Chinese products"; countered with demos, unboxing, samples
+- **Price** — Lebanese economic crisis and currency volatility; value framing beats discount framing
+- **Trust** — unknown online store with no physical presence; COD, WhatsApp, reviews reduce hesitation
 
 ---
 
 ## Key decisions — do not change without updating this file
 
-- **Phase 0 is NEVER on the cron.** It is a manual trigger only (`npm run phase0`). Niches don't change week to week. Running it weekly wastes tokens and produces duplicate output.
+- **Phase 0 is a manual trigger only** (`npm run phase0`). Niches don't change run to run. Running it repeatedly wastes tokens and produces duplicate output.
 - **Keywords are generated ONCE per niche.** Phase 1 checks Notion before generating. If a niche already has keywords in Notion, it is skipped entirely. Do not add regeneration logic without explicit owner instruction.
-- **The weekly cron starts at Phase 2, not Phase 0.** Flow A and Flow B are separate entry points. Never chain Phase 0 into the cron.
+- **The pipeline starts at Phase 2, not Phase 0.** Flow A and Flow B are separate entry points. Never chain Phase 0 into the pipeline.
 - **discovered-keywords.json is the contract between Flow A and Flow B.** Do not change its schema without updating the Phase 2 reader simultaneously.
 - **Phase numbering has shifted.** The old Phase 1 is now Phase 2, old Phase 2 is now Phase 3, and so on. All file names use the new numbers. Do not revert to old numbering.
 - **Phase 5 is the only analysis phase.** There is no offline stopgap — Claude is required to produce reports.
 - **Ad platform is Meta Ad Library**, not TikTok — better Lebanon/MENA data, public API, no auth headaches.
-- **Alibaba**: HTTP scraping (no official API). If scraping breaks, fallback is SerpAPI (~$50/mo).
-- **No UI**: Pure backend. Agent runs on schedule, writes to Notion, owner reviews Notion.
+- **Supplier research is manual.** Phase 5 does not automate Alibaba. The owner searches manually after reviewing Notion output.
+- **No UI, no scheduler.** Pure backend. Run `npm run pipeline` manually, review Notion output.
 
 ---
 
 ## Cost estimate
-- Claude API: ~$10–20/week (200 products analysed, Opus pricing)
+- Phase 3 (Sonnet 4.6): ~$0.50–2.00 per run (30 brands × ~2500 input + 800 output tokens)
+- Phase 5 (Opus 4.7): ~$0.50–1.50 per run (5–10 candidates × ~3000 input + 800 output tokens)
 - SerpApi: free tier (100 calls/month) — sufficient for monthly Phase 0 runs
 - Meta Ad Library: free
-- Alibaba scraping: free (or $50/mo SerpAPI fallback)
 - Notion API: free
-- Hosting: $0 (runs locally)
-- **Total: $10–20/week**
+- Hosting: $0 (runs locally, on demand)
+- **Total: ~$1–5 per pipeline run**
 
 ---
 
@@ -434,4 +437,4 @@ Common objection categories for Lebanon:
 - Handle rate limiting gracefully — add delays between API calls
 - Store intermediate results in /data as JSON — if a phase fails, the previous phase output is not lost
 - Never hardcode API keys — always read from .env via dotenv
-- When building Phase 0, Phase 0.5, or Phase 1: add a `npm run phase0`, `npm run phase0-5`, `npm run phase1` script to package.json so they can be triggered manually without touching the cron
+- When building Phase 0, Phase 0.5, or Phase 1: add a `npm run phase0`, `npm run phase0-5`, `npm run phase1` script to package.json so they can be triggered manually

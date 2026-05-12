@@ -1,8 +1,9 @@
 /**
- * Flow B — Weekly research pipeline orchestrator
+ * Flow B — Research pipeline orchestrator
  *
  * Runs phases 2 → 6 in sequence. Stops immediately if any phase fails.
  * Reads discovered-keywords.json (produced by Flow A) to drive the scraper.
+ * Run manually whenever you want fresh product research — no cron, no scheduler.
  *
  * Usage:
  *   npm run pipeline          — full run (Claude required for phases 3 and 5)

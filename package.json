@@ -16,19 +16,16 @@
     "setup": "ts-node src/utils/setup-notion-db.ts",
     "build": "tsc",
     "lint": "echo \"lint placeholder — add eslint later\" && exit 0",
-    "pipeline": "ts-node src/pipeline.ts",
-    "scheduler": "ts-node src/scheduler.ts"
+    "pipeline": "ts-node src/pipeline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
     "@notionhq/client": "^2.2.15",
     "axios": "^1.7.7",
-    "dotenv": "^16.4.5",
-    "node-cron": "^4.2.1"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "@types/node-cron": "^3.0.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.3"
   },

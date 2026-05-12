@@ -8,6 +8,7 @@ import {
   Phase5Output,
   ProductCandidate,
   ProductReport,
+  RecommendedNextStep,
 } from "../types";
 import { MODEL_DEEP } from "../utils/claude";
 import { log } from "../utils/logger";
@@ -17,8 +18,6 @@ dotenv.config();
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
 const INPUT_PATH = path.join(DATA_DIR, "candidates-with-competition.json");
 const OUTPUT_PATH = path.join(DATA_DIR, "reports.json");
-const BETWEEN_CALLS_DELAY_MS = 2000;
-
 const SYSTEM_PROMPT = `You are a private label product analyst specialising in the Lebanese market.
 You write in plain, direct English for a Lebanese entrepreneur sourcing manually and selling locally.
 You respond with valid JSON only — no markdown, no explanation, no code fences.`;
@@ -26,40 +25,44 @@ You respond with valid JSON only — no markdown, no explanation, no code fences
 // ── prompt builder ─────────────────────────────────────────────────────────────
 
 export function buildPrompt(c: ProductCandidate): string {
-  const productName = c.product_analysis?.identification.product_name ?? c.page_name;
-  const category = c.product_analysis?.identification.category ?? "unknown";
-  const verdict = c.product_analysis?.winning_product_assessment.verdict ?? "unknown";
-  const competitionLevel = c.lebanon_competition?.competition_level ?? "Unknown";
-  const totalCompetitors = c.lebanon_competition?.total_competitors ?? 0;
-  const seriousCompetitors = c.lebanon_competition?.serious_competitors ?? 0;
-  const mainHook = c.product_analysis?.product_intelligence.main_hook ?? "";
-  const problemsSolved = c.product_analysis?.product_intelligence.problems_solved.join(", ") ?? "";
-  const economics = c.product_analysis?.economics_estimate;
+  return `You are analyzing a private label product opportunity for the Lebanese market.
 
-  return `Analyse this private label opportunity for the Lebanese market.
+=== PHASE 3 ANALYSIS ===
+${JSON.stringify(c.product_analysis, null, 2)}
 
-BRAND: ${c.page_name}
-PRODUCT: ${productName}
-CATEGORY: ${category}
-SCALING SCORE: ${c.scaling_score}
-WINNING VERDICT: ${verdict}
-MAIN HOOK: ${mainHook}
-PROBLEMS SOLVED: ${problemsSolved}
-ECONOMICS: cost range ${economics?.category_cost_range_usd ?? "unknown"}, ${economics?.margin_universe_check ?? "unknown"}
-LEBANON COMPETITION: ${competitionLevel} (${totalCompetitors} total competitors, ${seriousCompetitors} serious)
-MANUAL CHECK URL: ${c.lebanon_competition?.manual_check_url ?? ""}
+=== LEBANON COMPETITION ===
+${JSON.stringify(c.lebanon_competition, null, 2)}
 
----
+=== BRAND CONTEXT ===
+Page name: ${c.page_name}
+Scaling score: ${c.scaling_score}
+Ad count: ${c.ad_count}
+Active ads: ${c.active_ad_count}
+Max days running: ${c.max_days_running}
+Niches hit: ${c.niches_hit.join(", ")}
 
+=== LEBANON MARKET CONTEXT ===
+- Shipping: local postal services are unreliable; DHL/FedEx are the trusted alternative
+- Quality: strong cultural distrust of "cheap Chinese products"; unboxing videos and demo content help
+- Price: Lebanese pound devaluation and economic crisis make buyers hyper price-conscious; value framing beats discount framing
+- Trust: buying from an unknown online store feels risky; COD option, reviews, and Instagram presence reduce hesitation
+
+=== YOUR TASK ===
 Generate a JSON report with exactly these four fields:
 
 "market_analysis"
-  2–3 sentences. Data-driven. Reference the Lebanon competition level, the ad activity seen,
-  and the specific opportunity or risk for a new private label entrant right now.
+  2–3 sentences. Data-driven. Reference the Lebanon competition level, the scaling signal, and the
+  specific opportunity or risk for a new private label entrant right now.
 
 "customer_objections"
   Array of exactly 4 objects — one per category (Shipping, Quality, Price, Trust), in that order.
   Write customer_voice as the raw, unfiltered thought a skeptical Lebanese buyer would have.
+
+  CRITICAL: Objections must be PRODUCT-SPECIFIC, not generic. A car organizer's Quality objection
+  differs from a sleep mask's. Reference the actual product, its price point, and its specific use
+  case in each objection. Generic objections (e.g. "Chinese product stigma" applied identically to
+  every product) are not acceptable — anchor each objection in this specific product's context.
+
   Schema per object:
   {
     "category": "Shipping" | "Quality" | "Price" | "Trust",
@@ -68,25 +71,29 @@ Generate a JSON report with exactly these four fields:
     "counter": "one concrete action for the product page or ad that neutralises this objection"
   }
 
-  Lebanon context to inform each objection:
-  - Shipping: local postal services are unreliable; DHL/FedEx are the trusted alternative
-  - Quality: strong cultural distrust of "cheap Chinese products"; unboxing videos and demo content help
-  - Price: Lebanese pound devaluation and economic crisis make buyers hyper price-conscious; value framing beats discount framing
-  - Trust: buying from an unknown online store feels risky; COD option, reviews, and Instagram presence reduce hesitation
-
 "agent_verdict"
   2–3 plain sentences. What is the opportunity, what is the single biggest risk?
 
 "recommended_next_step"
-  One specific, actionable instruction for what to do in the next 7 days.
-  Be concrete — name a supplier search action, a test budget, or a specific market validation step.
+  A structured object with exactly four fields:
+  {
+    "action": "specific action verb + specific target — e.g. 'Order 5 samples from Alibaba for [product] and test personally within 7 days'",
+    "why": "one sentence on why this is the right first action given the data above",
+    "success_criteria": "one sentence on how you will know this action worked",
+    "kill_criteria": "one sentence on what outcome would tell you to stop pursuing this product entirely"
+  }
 
 Respond with ONLY this JSON:
 {
   "market_analysis": "...",
   "customer_objections": [ ... ],
   "agent_verdict": "...",
-  "recommended_next_step": "..."
+  "recommended_next_step": {
+    "action": "...",
+    "why": "...",
+    "success_criteria": "...",
+    "kill_criteria": "..."
+  }
 }`;
 }
 
@@ -103,7 +110,29 @@ interface ClaudeAnalysis {
   market_analysis: string;
   customer_objections: ClaudeObjection[];
   agent_verdict: string;
-  recommended_next_step: string;
+  recommended_next_step: RecommendedNextStep;
+}
+
+function isValidObjection(v: unknown): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.category === "string" && o.category.length > 0 &&
+    typeof o.customer_voice === "string" && o.customer_voice.length > 0 &&
+    typeof o.why_it_matters_in_lebanon === "string" && o.why_it_matters_in_lebanon.length > 0 &&
+    typeof o.counter === "string" && o.counter.length > 0
+  );
+}
+
+function isValidNextStep(v: unknown): v is RecommendedNextStep {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.action === "string" && o.action.length > 0 &&
+    typeof o.why === "string" && o.why.length > 0 &&
+    typeof o.success_criteria === "string" && o.success_criteria.length > 0 &&
+    typeof o.kill_criteria === "string" && o.kill_criteria.length > 0
+  );
 }
 
 function parseResponse(raw: string, productName: string): ClaudeAnalysis | null {
@@ -113,9 +142,25 @@ function parseResponse(raw: string, productName: string): ClaudeAnalysis | null 
       .replace(/\s*```$/i, "")
       .trim();
     const parsed = JSON.parse(cleaned) as ClaudeAnalysis;
-    if (!parsed.market_analysis || !Array.isArray(parsed.customer_objections)) {
-      throw new Error("Missing required fields in response");
+
+    if (!parsed.market_analysis || typeof parsed.market_analysis !== "string") {
+      throw new Error("market_analysis is missing or not a string");
     }
+    if (!Array.isArray(parsed.customer_objections)) {
+      throw new Error("customer_objections is not an array");
+    }
+    if (parsed.customer_objections.length !== 4) {
+      throw new Error(
+        `Expected exactly 4 customer_objections, got ${parsed.customer_objections.length}`,
+      );
+    }
+    if (!parsed.customer_objections.every(isValidObjection)) {
+      throw new Error("One or more customer_objections is missing required fields");
+    }
+    if (!isValidNextStep(parsed.recommended_next_step)) {
+      throw new Error("recommended_next_step is missing required fields or wrong shape");
+    }
+
     return parsed;
   } catch (err) {
     log.warn(`Failed to parse Claude response for "${productName}"`, {
@@ -152,8 +197,6 @@ export async function analyseProduct(
   askClaude: AskClaudeFn,
 ): Promise<ProductReport | null> {
   const productName = candidate.product_analysis?.identification.product_name ?? candidate.page_name;
-  log.info(`Analysing "${productName}"...`);
-
   let raw: string;
   try {
     raw = await askClaude(buildPrompt(candidate), SYSTEM_PROMPT, MODEL_DEEP);
@@ -167,7 +210,7 @@ export async function analyseProduct(
   const analysis = parseResponse(raw, productName);
   if (!analysis) return null;
 
-  const report: ProductReport = {
+  return {
     ...candidate,
     market_analysis: analysis.market_analysis,
     customer_objections: mapObjections(analysis.customer_objections),
@@ -175,9 +218,38 @@ export async function analyseProduct(
     recommended_next_step: analysis.recommended_next_step,
     week_generated: new Date().toISOString().split("T")[0],
   };
+}
 
-  log.info(`  "${productName}" — analysis done`);
-  return report;
+// ── Filter criteria ────────────────────────────────────────────────────────────
+// Target: 5-10 eligible candidates per run
+
+function skipReason(c: ProductCandidate): string | null {
+  if (c.lebanon_competition?.competition_level === "Heavy")
+    return "competition_level=Heavy";
+  if (c.analysis_status !== "success")
+    return `analysis_status=${c.analysis_status}`;
+  if (c.product_analysis?.winning_product_assessment?.verdict === "weak_signal")
+    return "verdict=weak_signal";
+  // Proxy for private_label_fit=low — update if private_label_fit is added to the Phase 3 schema
+  if (c.product_analysis?.economics_estimate?.viable_for_private_label === false)
+    return "viable_for_private_label=false";
+  return null;
+}
+
+// ── Cost estimation ────────────────────────────────────────────────────────────
+// Rough estimate: Opus 4.7 at $15/1M input + $75/1M output
+
+const EST_INPUT_TOKENS = 3000;  // average per call for this prompt structure
+const EST_OUTPUT_TOKENS = 800;
+const OPUS_INPUT_CPM  = 15;     // cost per 1M tokens
+const OPUS_OUTPUT_CPM = 75;
+
+function estimateCost(calls: number): string {
+  const usd = calls * (
+    (EST_INPUT_TOKENS  * OPUS_INPUT_CPM  / 1_000_000) +
+    (EST_OUTPUT_TOKENS * OPUS_OUTPUT_CPM / 1_000_000)
+  );
+  return `~$${usd.toFixed(3)}`;
 }
 
 // ── main ───────────────────────────────────────────────────────────────────────
@@ -208,40 +280,53 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Skip candidates where Lebanon competition is Heavy
-  const eligible = candidates.filter(
-    (c) => c.lebanon_competition?.competition_level !== "Heavy",
-  );
-  const skipped = candidates.filter(
-    (c) => c.lebanon_competition?.competition_level === "Heavy",
-  );
+  const total = candidates.length;
 
-  log.info("Phase 5 starting — Claude deep analysis", {
-    totalCandidates: candidates.length,
-    eligible: eligible.length,
-    skippedHeavyCompetition: skipped.length,
+  // ── Filter pass — log each candidate with its global index ───────────────────
+  const skippedReasons: Record<string, number> = {};
+  const eligibleWithIndex: Array<{ candidate: ProductCandidate; globalIndex: number }> = [];
+
+  for (let i = 0; i < total; i++) {
+    const c = candidates[i];
+    const reason = skipReason(c);
+    if (reason) {
+      log.info(`[${i + 1}/${total}] page_name=${c.page_name} SKIPPED reason="${reason}"`);
+      skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
+    } else {
+      eligibleWithIndex.push({ candidate: c, globalIndex: i });
+    }
+  }
+
+  log.info(`Phase 5 — ${eligibleWithIndex.length} eligible of ${total} candidates`, {
     model: MODEL_DEEP,
   });
 
-  if (skipped.length > 0) {
-    log.info(
-      "Skipping (Heavy Lebanon competition):",
-      skipped.map((c) => c.product_analysis?.identification.product_name ?? c.page_name),
-    );
-  }
-
-  if (eligible.length === 0) {
-    log.warn("All candidates have Heavy Lebanon competition — nothing to analyse.");
+  if (eligibleWithIndex.length === 0) {
+    log.warn("No candidates passed the filter — nothing to analyse.");
     process.exit(0);
   }
 
+  // ── Analysis loop ─────────────────────────────────────────────────────────────
   const reports: ProductReport[] = [];
+  let successCount = 0;
+  let failedCount = 0;
 
-  for (let i = 0; i < eligible.length; i++) {
-    const report = await analyseProduct(eligible[i], askClaude);
-    if (report) reports.push(report);
-    if (i < eligible.length - 1) {
-      await new Promise<void>((r) => setTimeout(r, BETWEEN_CALLS_DELAY_MS));
+  for (const { candidate, globalIndex } of eligibleWithIndex) {
+    const product = candidate.product_analysis?.identification.product_name ?? candidate.page_name;
+    const report = await analyseProduct(candidate, askClaude);
+
+    if (report) {
+      const verdict = report.product_analysis?.winning_product_assessment.verdict ?? "unknown";
+      log.info(
+        `[${globalIndex + 1}/${total}] page_name=${candidate.page_name} product="${product}" status=success verdict=${verdict}`,
+      );
+      reports.push(report);
+      successCount++;
+    } else {
+      log.warn(
+        `[${globalIndex + 1}/${total}] page_name=${candidate.page_name} product="${product}" status=failed`,
+      );
+      failedCount++;
     }
   }
 
@@ -250,17 +335,23 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // ── Write output ──────────────────────────────────────────────────────────────
   const output: Phase5Output = reports;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
-  log.info(`Phase 5 complete. Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
-  log.info("Run `npm run phase6` to write reports to Notion.");
 
-  reports.forEach((r, i) => {
-    const name = r.product_analysis?.identification.product_name ?? r.page_name;
-    log.info(`  ${i + 1}. ${name}`);
-    log.info(`     Next step: ${r.recommended_next_step}`);
+  // ── End-of-run summary ────────────────────────────────────────────────────────
+  log.info("Phase 5 summary", {
+    totalCandidatesFromPhase4: total,
+    skipped: total - eligibleWithIndex.length,
+    skippedReasonBreakdown: skippedReasons,
+    eligible: eligibleWithIndex.length,
+    successful: successCount,
+    failed: failedCount,
+    estimatedOpusCost: estimateCost(successCount),
   });
+  log.info(`Wrote ${reports.length} reports to ${OUTPUT_PATH}`);
+  log.info("Run `npm run phase6` to write reports to Notion.");
 }
 
 if (require.main === module) {
